@@ -1,0 +1,55 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>NationalArchives.Taxonomy.Common</RootNamespace>
+    <AssemblyName>NationalArchives.Taxonomy.Common</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Domain\Repository\Elastic\Helpers\**" />
+    <EmbeddedResource Remove="Domain\Repository\Elastic\Helpers\**" />
+    <None Remove="Domain\Repository\Elastic\Helpers\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="AWSSDK.Core" Version="3.7.13.3" />
+    <PackageReference Include="AWSSDK.SecurityToken" Version="3.7.1.198" />
+    <PackageReference Include="ElasticSearch" Version="1.4.2" />
+    <PackageReference Include="Elasticsearch.Net" Version="6.8.11" />
+    <PackageReference Include="Elasticsearch.Net.Aws" Version="6.1.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="2.2.0" />
+    <PackageReference Include="MongoDB.Driver" Version="2.15.0" />
+    <PackageReference Include="NEST" Version="6.8.11" />
+    <PackageReference Include="NEST.JsonNetSerializer" Version="6.8.11" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="Lucene.Net" version="4.8.0-beta00014" />
+    <PackageReference Include="Lucene.Net.Analysis.Common" version="4.8.0-beta00014" />
+    <PackageReference Include="Lucene.Net.Queries" version="4.8.0-beta00014" />
+    <PackageReference Include="Lucene.Net.QueryParser" version="4.8.0-beta00014" />
+    <PackageReference Include="Lucene.Net.Sandbox" version="4.8.0-beta00014" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="6.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NationalArchives.ActiveMQ\NationalArchives.ActiveMQ.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

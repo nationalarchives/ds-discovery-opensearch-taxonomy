@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup Label="Globals">
+    <SccProjectName>%24/Discovery/Projects/ActiveMQ/netstandard-authentication/NationalArchives.ActiveMQ</SccProjectName>
+    <SccProvider>{4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}</SccProvider>
+    <SccAuxPath>https://tna.visualstudio.com/defaultcollection</SccAuxPath>
+    <SccLocalPath>.</SccLocalPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageProjectUrl>https://tna.visualstudio.com/Discovery/_versionControl?path=%24%2FDiscovery%2FProjects%2FActiveMQ</PackageProjectUrl>
+    <Authors>voliynyk,  boreilly</Authors>
+    <Company>voliynyk,  boreilly</Company>
+    <Description>Wrapper for using an ActiveMQ instance from a .NET based consumer and/or publisher.</Description>
+    <PackageReleaseNotes>Initial version (migrated to .Net Standard from .Net Framework).  
+v1.4: Compilation changes from x64 to Any CPU for compatibiity with Elastic Search indexer code.
+v1.5: Updated Nuget Packages
+v1.6 Reverted Apache.NMS and Apache.NMS.ActiveMQ from v2.0 to 1.8 due to assembly ;pad/resolution/impelementation issues.</PackageReleaseNotes>
+    <RepositoryUrl>https://tna.visualstudio.com/Discovery/_versionControl?path=$/Discovery/Projects/ActiveMQ</RepositoryUrl>
+    <PackageTags>ActiveMQ queue  elastic taxonomy</PackageTags>
+    <Copyright>"Copyright © The National Archives 2021"</Copyright>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <NeutralLanguage></NeutralLanguage>
+    <AssemblyVersion>1.6.0.0</AssemblyVersion>
+    <FileVersion>1.6.0.0</FileVersion>
+    <Version>1.6.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  
+  <PropertyGroup>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Apache.NMS" Version="1.8.0" />
+    <PackageReference Include="Apache.NMS.ActiveMQ" Version="1.8.0" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,200 @@
+﻿using AutoMapper;
+using Lucene.Net.Analysis;
+using Lucene.Net.Analysis.Core;
+using Lucene.Net.Analysis.Miscellaneous;
+using Lucene.Net.Analysis.Standard;
+using Lucene.Net.Analysis.Synonym;
+using Lucene.Net.Util;
+using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using NationalArchives.Taxonomy.Common.BusinessObjects;
+using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
+using NationalArchives.Taxonomy.Common.Domain.Queue;
+using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
+using NationalArchives.Taxonomy.Common.Domain.Repository.Elastic;
+using NationalArchives.Taxonomy.Common.Domain.Repository.Lucene;
+using NationalArchives.Taxonomy.Common.Domain.Repository.Mongo;
+using NationalArchives.Taxonomy.Common.Service;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+namespace NationalArchives.Taxonomy.CLI
+{
+    public class Program
+    {
+        private const string SHOW_CONFIG_INFO = "Shows application confirguration information.";
+
+        static int Main(string[] args)
+        {
+            try
+            {
+                Console.WriteLine("Configuring application.");
+
+                var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+
+                var builder = new ConfigurationBuilder()
+                 .SetBasePath(Directory.GetCurrentDirectory())
+                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                 .AddJsonFile($"appsettings.{environmentName}.json", optional: true, reloadOnChange: true)
+                 .AddEnvironmentVariables("TAXONOMY_");
+
+                var config = builder.Build();
+                IServiceProvider provider = ConfigureServices(config, args);
+
+                var app = new CommandLineApplication<Categoriser>();
+
+                app.Conventions
+                    .UseDefaultConventions()
+                    .UseConstructorInjection(provider);
+                int executeResult = app.Execute(args);
+                return executeResult;
+            }
+            catch(AggregateException ae)
+            {
+                foreach(Exception e in ae.InnerExceptions)
+                {
+                    Console.WriteLine("Error Occured: " + e.Message);
+                }
+                return -1;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error Occured: " + e.Message);
+
+                if (e.InnerException != null)
+                {
+                    Console.WriteLine(e.InnerException.Message);
+                }
+                return -1;
+            }
+            finally
+            {
+#if DEBUG
+                Console.ReadLine();
+#endif
+            }
+        }
+
+        
+        private static ServiceProvider ConfigureServices(IConfigurationRoot config, string[] args)
+        {
+            var services = new ServiceCollection();
+
+            services.AddAutoMapper(mc => mc.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }));
+
+            services.AddSingleton<ILoggerFactory, LoggerFactory>();
+            services.AddSingleton(typeof(ILogger<Analyzer>), typeof(Logger<Analyzer>));
+
+            services.AddSingleton<DiscoverySearchElasticConnectionParameters>(config.GetSection("DiscoveryElasticParams").Get<DiscoverySearchElasticConnectionParameters>());
+            services.AddSingleton<CategoryDataElasticConnectionParameters>(config.GetSection("CategoryElasticParams").Get<CategoryDataElasticConnectionParameters>());
+            services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
+
+            services.AddTransient<IConnectElastic<ElasticRecordAssetView>>((ctx) =>
+            {
+                ElasticConnectionParameters cparams = ctx.GetRequiredService<DiscoverySearchElasticConnectionParameters>();
+                IConnectElastic<ElasticRecordAssetView> recordAssetsElasticConnection = new ElasticConnection<ElasticRecordAssetView>(cparams);
+                return recordAssetsElasticConnection;
+            });
+
+            services.AddTransient<IIAViewRepository>((ctx) =>
+            {
+                IMapper mapper = ctx.GetRequiredService<IMapper>();
+                IConnectElastic<ElasticRecordAssetView> elasticConnectionInfo = ctx.GetRequiredService<IConnectElastic<ElasticRecordAssetView>>();
+                LuceneHelperTools luceneHelperTools = ctx.GetRequiredService<LuceneHelperTools>();
+                ElasticIAViewRepository iaRepo = new ElasticIAViewRepository(elasticConnectionInfo, luceneHelperTools, mapper);
+                return iaRepo;
+            });
+
+            CategorySource categorySource = (CategorySource)Enum.Parse(typeof(CategorySource), config.GetValue<string>("CategorySource"));
+            // Get the categories form either Mongo or Elastic
+            switch (categorySource)
+            {
+                case CategorySource.Elastic:
+
+                    // Categories connection info
+                    services.AddTransient<IConnectElastic<CategoryFromElastic>>((ctx) =>
+                    {
+                        CategoryDataElasticConnectionParameters categoryDataElasticConnParams = config.GetSection("CategoryElasticParams").Get<CategoryDataElasticConnectionParameters>();
+                        IConnectElastic<CategoryFromElastic> categoriesElasticConnection = new ElasticConnection<CategoryFromElastic>(categoryDataElasticConnParams);
+                        return categoriesElasticConnection;
+                    });
+
+                    // category list repo using category connection info.
+                    services.AddTransient<ICategoryRepository, ElasticCategoryRepository>((ctx) =>
+                    {
+                        IMapper mapper = ctx.GetRequiredService<IMapper>();
+                        IConnectElastic<CategoryFromElastic> elasticConnectionInfo = ctx.GetRequiredService<IConnectElastic<CategoryFromElastic>>();
+                        ElasticCategoryRepository categoryRepo = new ElasticCategoryRepository(elasticConnectionInfo, mapper);
+                        return categoryRepo;
+                    });
+
+                    break;
+
+                case CategorySource.Mongo:
+                    //Mongo categories
+                    services.AddTransient<ICategoryRepository, MongoCategoryRepository>((ctx) =>
+                    {
+                        IMapper mapper = ctx.GetRequiredService<IMapper>();
+                        MongoConnectionParams categoryDataMongoConnParams = config.GetSection("CategoryMongoParams").Get<MongoConnectionParams>();
+                        MongoCategoryRepository categoryRepo = new MongoCategoryRepository(categoryDataMongoConnParams, mapper);
+                        return categoryRepo;
+                    });
+
+                    break;
+                default:
+                    throw new ApplicationException("Invalid category Source");
+            }
+
+            bool hasLiveUpdates = args.Any(a => a.StartsWith("-c"));
+
+            if (hasLiveUpdates)
+            {
+                //params for update staging queue.
+                services.AddSingleton<UpdateStagingQueueParams>(config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>());
+
+                services.AddSingleton<IUpdateStagingQueueSender>((ctx) =>
+                {
+                    UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                    return new ActiveMqDirectUpdateSender(qParams);
+                }); 
+            }
+
+            CategoriserLuceneParams categoriserLuceneParams = config.GetSection("CategoriserLuceneParams").Get<CategoriserLuceneParams>();
+
+            LuceneHelperTools.ConfigureLuceneServices(categoriserLuceneParams, services);
+
+            services.AddTransient<ICategoriserRepository>((ctx) =>
+            {
+                //TODO: Further testing on  setting - so far we seem to get better performance with false!
+                var analyser = ctx.GetRequiredService<Analyzer>();
+                var luceneHelperTools = ctx.GetRequiredService<LuceneHelperTools>();
+                var logger = ctx.GetRequiredService<ILogger<ICategoriserRepository>>();
+                InMemoryCategoriserRepository categoriserRepo = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyser, luceneHelperTools: luceneHelperTools, logger: logger);
+                return categoriserRepo;
+            });
+
+            services.AddTransient<ICategoriserService<CategorisationResult>>((ctx) =>
+            {
+                ICategoryRepository categeoryRepo = ctx.GetRequiredService<ICategoryRepository>();
+                IIAViewRepository iaViewRepository = ctx.GetRequiredService<IIAViewRepository>();
+                IUpdateStagingQueueSender stagingQueueSender = hasLiveUpdates ? ctx.GetRequiredService<IUpdateStagingQueueSender>() : null;
+                ICategoriserRepository categoriserRepo = ctx.GetRequiredService<ICategoriserRepository>();
+                return new QueryBasedCategoriserService
+                (   
+                    iaViewRepository: iaViewRepository, 
+                    categoryRepository: categeoryRepo, 
+                    categoriserRepository: categoriserRepo,
+                    stagingQueueSender: stagingQueueSender
+                );
+            });
+
+
+                ServiceProvider provider = services.BuildServiceProvider();
+            return provider;
+        }
+    }
+}

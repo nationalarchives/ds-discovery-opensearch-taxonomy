@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "NationalArchives.Taxonomy.Batch": {
+      "commandName": "Project",
+      "commandLineArgs": "--console",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
