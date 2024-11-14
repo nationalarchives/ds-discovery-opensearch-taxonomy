@@ -2,9 +2,9 @@
 using System;
 using System.Collections.Generic;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
-    public class ElasticSearchParameters
+    public class OpenSearchParameters
     {
 
         private HeldByCode _helByCode;

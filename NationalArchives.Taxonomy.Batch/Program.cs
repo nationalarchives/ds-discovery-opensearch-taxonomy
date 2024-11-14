@@ -11,10 +11,10 @@ using NationalArchives.Taxonomy.Batch.FullReindex.Producers;
 using NationalArchives.Taxonomy.Batch.FullReindex.Queues;
 using NationalArchives.Taxonomy.Batch.Service;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
+using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Queue;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
-using NationalArchives.Taxonomy.Common.Domain.Repository.Elastic;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Lucene;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Mongo;
 using NationalArchives.Taxonomy.Common.Service;
@@ -121,7 +121,7 @@ namespace NationalArchives.Taxonomy.Batch
             }
 
 
-            DiscoverySearchElasticConnectionParameters discoverySearchElasticConnParams = config.GetSection("DiscoveryElasticParams").Get<DiscoverySearchElasticConnectionParameters>();
+            DiscoveryOpenSearchConnectionParameters discoveryOpenSearchConnParams = config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>();
            
 
             services.AddSingleton<CategorisationParams>(categorisationParams);
@@ -135,10 +135,10 @@ namespace NationalArchives.Taxonomy.Batch
             services.AddSingleton<UpdateStagingQueueParams>(updateStagingQueueParams);
 
             // IAIDs connection info
-            services.AddTransient<IConnectElastic<ElasticRecordAssetView>>((ctx) =>
+            services.AddTransient<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) =>
             {
-                IConnectElastic<ElasticRecordAssetView> recordAssetsElasticConnection = new ElasticConnection<ElasticRecordAssetView>(discoverySearchElasticConnParams);
-                return recordAssetsElasticConnection;
+                IConnectOpenSearch<OpenSearchRecordAssetView> recordAssetsOpenSearchConnection = new OpenSearchConnection<OpenSearchRecordAssetView>(discoveryOpenSearchConnParams);
+                return recordAssetsOpenSearchConnection;
             });
 
 
@@ -147,33 +147,33 @@ namespace NationalArchives.Taxonomy.Batch
             services.AddTransient<IIAViewRepository>((ctx) =>
             {
                 IMapper mapper = ctx.GetRequiredService<IMapper>();
-                IConnectElastic<ElasticRecordAssetView> elasticConnectionInfo = ctx.GetRequiredService<IConnectElastic<ElasticRecordAssetView>>();
+                IConnectOpenSearch<OpenSearchRecordAssetView> openSearchConnectionInfo = ctx.GetRequiredService<IConnectOpenSearch<OpenSearchRecordAssetView>>();
                 LuceneHelperTools luceneHelperTools = ctx.GetRequiredService<LuceneHelperTools>();
-                ElasticIAViewRepository iaRepo = new ElasticIAViewRepository(elasticConnectionInfo, luceneHelperTools, mapper);
+                OpenSearchIAViewRepository iaRepo = new OpenSearchIAViewRepository(openSearchConnectionInfo, luceneHelperTools, mapper);
                 return iaRepo;
             });
 
 
             CategorySource categorySource = (CategorySource)Enum.Parse(typeof(CategorySource), config.GetValue<string>("CategorySource"));
-            // Get the categories form either Mongo or Elastic
+            // Get the categories form either Mongo or open Search
             switch(categorySource)
             {
-                case CategorySource.Elastic:
+                case CategorySource.OpenSearch:
 
                     // Categories connection info
-                    services.AddTransient<IConnectElastic<CategoryFromElastic>>((ctx) =>
+                    services.AddTransient<IConnectOpenSearch<CategoryFromOpenSearch>>((ctx) =>
                     {
-                        CategoryDataElasticConnectionParameters categoryDataElasticConnParams = config.GetSection("CategoryElasticParams").Get<CategoryDataElasticConnectionParameters>();
-                        IConnectElastic<CategoryFromElastic> categoriesElasticConnection = new ElasticConnection<CategoryFromElastic>(categoryDataElasticConnParams);
-                        return categoriesElasticConnection;
+                        CategoryDataOpenSearchConnectionParameters categoryDataOpenSearchConnParams = config.GetSection("CategoryOpenSearchParams").Get<CategoryDataOpenSearchConnectionParameters>();
+                        IConnectOpenSearch<CategoryFromOpenSearch> categoriesOpenSearchConnection = new OpenSearchConnection<CategoryFromOpenSearch>(categoryDataOpenSearchConnParams);
+                        return categoriesOpenSearchConnection;
                     });
 
                     // category list repo using category connection info.
-                    services.AddTransient<ICategoryRepository, ElasticCategoryRepository>((ctx) =>
+                    services.AddTransient<ICategoryRepository, OpenSearchCategoryRepository>((ctx) =>
                     {
                         IMapper mapper = ctx.GetRequiredService<IMapper>();
-                        IConnectElastic<CategoryFromElastic> elasticConnectionInfo = ctx.GetRequiredService<IConnectElastic<CategoryFromElastic>>();
-                        ElasticCategoryRepository categoryRepo = new ElasticCategoryRepository(elasticConnectionInfo, mapper);
+                        IConnectOpenSearch<CategoryFromOpenSearch> openSearchConnectionInfo = ctx.GetRequiredService<IConnectOpenSearch<CategoryFromOpenSearch>>();
+                        OpenSearchCategoryRepository categoryRepo = new OpenSearchCategoryRepository(openSearchConnectionInfo, mapper);
                         return categoryRepo;
                     });
 
@@ -277,7 +277,7 @@ namespace NationalArchives.Taxonomy.Batch
                    return new FullReIndexIaidPcQueue<string>(qparams.MaxSize);
                }); // =>  FullReindexService
 
-                var eElasticAssetBrowseParams = config.GetSection("ElasticAssetFetchParams").Get<ElasticAssetBrowseParams>();
+                var openSearchAssetBrowseParams = config.GetSection("OpenSearchAssetFetchParams").Get<OpenSearchAssetBrowseParams>();
 
                 services.AddSingleton<FullReindexIaidProducer>((ctx) =>
                 {
@@ -285,7 +285,7 @@ namespace NationalArchives.Taxonomy.Batch
                     var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
                     var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
 
-                    return new FullReindexIaidProducer(reindexQueue, iaViewService, eElasticAssetBrowseParams, logger);
+                    return new FullReindexIaidProducer(reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
                 });
                     
                 services.AddHostedService<FullReindexService>();

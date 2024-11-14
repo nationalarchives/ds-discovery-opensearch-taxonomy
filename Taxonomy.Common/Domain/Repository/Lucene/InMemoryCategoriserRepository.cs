@@ -14,7 +14,7 @@ using System.IO;
 using System.Linq;
 using lnu = Lucene.Net.Util;
 using Microsoft.Extensions.Logging;
-using NationalArchives.Taxonomy.Common.Domain.Repository.Elastic;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
 {
@@ -217,16 +217,16 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
             switch(_iaViewIndexAnalyser)
             {
                 case IAViewTextNoCasNoPuncAnalyser tncnp:
-                    listOfFields.AddRange(GetCopyIAViewFieldsToTaxonomyField(iaView, ElasticFieldConstants.TEXT_NO_CAS_NO_PUNC));
+                    listOfFields.AddRange(GetCopyIAViewFieldsToTaxonomyField(iaView, OpenSearchFieldConstants.TEXT_NO_CAS_NO_PUNC));
                     break;
                 case IAViewTextCasNoPuncAnalyser tcnp:
-                    listOfFields.AddRange(GetCopyIAViewFieldsToTaxonomyField(iaView, ElasticFieldConstants.TEXT_CAS_NO_PUNC));
+                    listOfFields.AddRange(GetCopyIAViewFieldsToTaxonomyField(iaView, OpenSearchFieldConstants.TEXT_CAS_NO_PUNC));
                     break;
                 case IAViewTextCasPuncAnalyser tcp:
-                    listOfFields.AddRange(GetCopyIAViewFieldsToTaxonomyField(iaView, ElasticFieldConstants.TEXT_CAS_PUNC));
+                    listOfFields.AddRange(GetCopyIAViewFieldsToTaxonomyField(iaView, OpenSearchFieldConstants.TEXT_CAS_PUNC));
                     break;
                 case IAViewTextGenAnalyser tg:
-                    listOfFields.AddRange(GetCopyIAViewFieldsToTaxonomyField(iaView, ElasticFieldConstants.TEXT_GEN));
+                    listOfFields.AddRange(GetCopyIAViewFieldsToTaxonomyField(iaView, OpenSearchFieldConstants.TEXT_GEN));
                     break;
                 default:
                     listOfFields.AddRange(GetListOfUnmodifiedFieldsFromIAView(iaView));
@@ -262,18 +262,18 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
             {
                 listOfFields.Add(new TextField(targetCommonIndexField, iaView.Title, Field.Store.NO));
             }
-            if (!String.IsNullOrWhiteSpace(iaView.ContextDescription) && queryFields.Contains(ElasticFieldConstants.CONTEXT, StringComparer.OrdinalIgnoreCase))
+            if (!String.IsNullOrWhiteSpace(iaView.ContextDescription) && queryFields.Contains(OpenSearchFieldConstants.CONTEXT, StringComparer.OrdinalIgnoreCase))
             {
                 listOfFields.Add(new TextField(targetCommonIndexField, iaView.ContextDescription, Field.Store.NO));
             }
-            if (iaView.CorpBodys != null  && iaView.CorpBodys.Length > 0 && queryFields.Contains(ElasticFieldConstants.CORPORATE_BODY, StringComparer.OrdinalIgnoreCase))
+            if (iaView.CorpBodys != null  && iaView.CorpBodys.Length > 0 && queryFields.Contains(OpenSearchFieldConstants.CORPORATE_BODY, StringComparer.OrdinalIgnoreCase))
             {
                 foreach (string corpBody in iaView.CorpBodys)
                 {
                     listOfFields.Add(new TextField(targetCommonIndexField, corpBody, Field.Store.NO));
                 }
             }
-            if (iaView.Subjects != null  && iaView.Subjects.Length > 0 && queryFields.Contains(ElasticFieldConstants.SUBJECT, StringComparer.OrdinalIgnoreCase))
+            if (iaView.Subjects != null  && iaView.Subjects.Length > 0 && queryFields.Contains(OpenSearchFieldConstants.SUBJECT, StringComparer.OrdinalIgnoreCase))
             {
                 foreach (string subject in iaView.Subjects)
                 {
@@ -281,21 +281,21 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                 }
             }
 
-            if (iaView.Person_FullName != null && iaView.Person_FullName.Length > 0 && queryFields.Contains(ElasticFieldConstants.PERSON, StringComparer.OrdinalIgnoreCase))
+            if (iaView.Person_FullName != null && iaView.Person_FullName.Length > 0 && queryFields.Contains(OpenSearchFieldConstants.PERSON, StringComparer.OrdinalIgnoreCase))
             {
                 foreach (string person in iaView.Person_FullName)
                 {
                     listOfFields.Add(new TextField(targetCommonIndexField, person, Field.Store.NO));
                 }
             }
-            if (iaView.Place_Name != null && iaView.Place_Name.Length > 0 && queryFields.Contains(ElasticFieldConstants.PLACE_NAME, StringComparer.OrdinalIgnoreCase))
+            if (iaView.Place_Name != null && iaView.Place_Name.Length > 0 && queryFields.Contains(OpenSearchFieldConstants.PLACE_NAME, StringComparer.OrdinalIgnoreCase))
             {
                 foreach (string place in iaView.Place_Name)
                 {
                     listOfFields.Add(new TextField(targetCommonIndexField, place, Field.Store.NO));
                 }
             }
-            if (!String.IsNullOrWhiteSpace(iaView.CatDocRef) && queryFields.Contains(ElasticFieldConstants.CATALOGUE_REFERENCE, StringComparer.OrdinalIgnoreCase))
+            if (!String.IsNullOrWhiteSpace(iaView.CatDocRef) && queryFields.Contains(OpenSearchFieldConstants.CATALOGUE_REFERENCE, StringComparer.OrdinalIgnoreCase))
             {
                 listOfFields.Add(new TextField(targetCommonIndexField, iaView.CatDocRef, Field.Store.NO));
             }

@@ -1,6 +1,5 @@
-﻿using Elasticsearch.Net;
-using NationalArchives.Taxonomy.Common.BusinessObjects;
-using Nest;
+﻿using NationalArchives.Taxonomy.Common.BusinessObjects;
+using OpenSearch.Client;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,40 +7,40 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
-    public class ElasticConnection<T> : IConnectElastic<T> where T : class
+    public class OpenSearchConnection<T> : IConnectOpenSearch<T> where T : class
     {
-        private IElasticClient _elasticClient;
-        private IElasticClient _elasticClientInMemory; //TODO : Possibly use a separate connection
+        private IOpenSearchClient _openSearchClient;
+        private IOpenSearchClient _openSearchClientInMemory; //TODO : Possibly use a separate connection
         private ISearchRequest _searchRequest;
 
-        private ElasticConnectionParameters _parameters;
+        private OpenSearchConnectionParameters _parameters;
 
         private string _inMemoryIndexName;
 
         private const string HELD_BY_CODE = "HELD_BY_CODE";
         private const string RESPSITORY = "RESPSITORY";
 
-        public ElasticConnection(ElasticConnectionParameters elasticConnectionParameters)
+        public OpenSearchConnection(OpenSearchConnectionParameters openSearchConnectionParameters)
         {
-            _parameters = elasticConnectionParameters;
+            _parameters = openSearchConnectionParameters;
             //ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, errors) => true;
             using (ConnectionSettings connectionSettings = ConnectionSettingsProvider.GetConnectionSettings(_parameters))
             {
                 //connectionSettings.DisableAutomaticProxyDetection(true);
-                _elasticClient = new ElasticClient(connectionSettings);
+                _openSearchClient = new OpenSearchClient(connectionSettings);
             }
         }
 
-        public long Count(ElasticSearchParameters searchParams)
+        public long Count(OpenSearchParameters searchParams)
         {
             var countRequest = new CountRequest(_parameters.IndexDatabase)
             {
                 Query = SetupSearchRequest(searchParams)
             };
 
-            var countResponse = _elasticClient.Count<T>(countRequest);
+            var countResponse = _openSearchClient.Count(countRequest);
 
             if (!countResponse.IsValid)
             {
@@ -55,7 +54,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
         }
 
 
-        public ISearchResponse<T> Search(ElasticSearchParameters searchParams)
+        public ISearchResponse<T> Search(OpenSearchParameters searchParams)
         {
             _searchRequest = new SearchRequest(_parameters.IndexDatabase)
             {
@@ -64,14 +63,14 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
                 Sort = SetSortOrder(searchParams.Sort)
             };
 
-            var searchResponse =  _elasticClient.Search<T>(_searchRequest);
+            var searchResponse =  _openSearchClient.Search<T>(_searchRequest);
 
             RaiseExceptionIfResponseIsInvalid(searchResponse);
 
             return searchResponse;
         }
 
-        public async Task<ISearchResponse<T>> SearchAsync(ElasticSearchParameters searchParams)
+        public async Task<ISearchResponse<T>> SearchAsync(OpenSearchParameters searchParams)
         {
             _searchRequest = new SearchRequest(_parameters.IndexDatabase)
             {   
@@ -91,7 +90,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
 
             try
             {
-                var searchResponse = await _elasticClient.SearchAsync<T>(_searchRequest);
+                var searchResponse = await _openSearchClient.SearchAsync<T>(_searchRequest);
                 RaiseExceptionIfResponseIsInvalid(searchResponse);
                 return searchResponse;
             }
@@ -103,28 +102,28 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
 
         public IGetResponse<T> Get(string id)
         {
-            IGetResponse<T> getResponse =  _elasticClient.Get<T>(id);
+            IGetResponse<T> getResponse =  _openSearchClient.Get<T>(id);
             RaiseExceptionIfResponseIsInvalid(getResponse);
             return getResponse;
         }
 
         public async Task<IGetResponse<T>> GetAsync(string id)
         {
-            IGetResponse<T> getResponse = await _elasticClient.GetAsync<T>(id);
+            IGetResponse<T> getResponse = await _openSearchClient.GetAsync<T>(id);
             RaiseExceptionIfResponseIsInvalid(getResponse);
             return getResponse;
         }
 
-        public async Task<IMultiGetResponse> MultiGetAsync(string[] ids)
+        public async Task<MultiGetResponse> MultiGetAsync(string[] ids)
         {
-            IMultiGetResponse multiGetResponse = await _elasticClient.MultiGetAsync(m => m.GetMany<T>(ids));
+            MultiGetResponse multiGetResponse = await _openSearchClient.MultiGetAsync(m => m.GetMany<T>(ids));
             RaiseExceptionIfResponseIsInvalid(multiGetResponse);
             return multiGetResponse;
         }
 
-        public IIndexResponse IndexDocument(T documentToIndex, bool useInmemoryIndex)
+        public IndexResponse IndexDocument(T documentToIndex, bool useInmemoryIndex)
         {
-            IIndexResponse indexResponse = null;
+            IndexResponse indexResponse = null;
 
             if (useInmemoryIndex)
             {
@@ -140,20 +139,20 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
                     
                     ICreateIndexRequest inMemoryIndexRequest = new CreateIndexRequest(inMemoryIndexName);
                     inMemoryIndexRequest.Settings = indexSettingsInMemory;
-                    var inMemoryIndex = _elasticClient.CreateIndex(inMemoryIndexRequest);
+                    var inMemoryIndex = _openSearchClient.Indices.Create(inMemoryIndexRequest);
                     _inMemoryIndexName = inMemoryIndex.ApiCall.Uri.PathAndQuery.Substring(1);
                 }
                 
-                indexResponse = _elasticClientInMemory.IndexDocument(documentToIndex);
+                indexResponse = _openSearchClientInMemory.IndexDocument(documentToIndex);
                 //Required since the document is not immediately visible by default.
                 // TODO May be possible in one call - see:
                 // https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-refresh.html
                 // But not sure  if NEST client supports this?
-                _elasticClientInMemory.Refresh(inMemoryIndexName);  
+                _openSearchClientInMemory.Indices.Refresh(inMemoryIndexName);  
             }
             else
             {
-                indexResponse = _elasticClient.IndexDocument(documentToIndex);
+                indexResponse = _openSearchClient.IndexDocument(documentToIndex);
             }
             
             return indexResponse;
@@ -165,12 +164,12 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
             // as this may be a legitimate outcome.  Possibly add additional get query just to get the coument and throw exception
             // if no result.
             string indexToUse = useInMemoryIndex ? _inMemoryIndexName : _parameters.IndexDatabase;
-            IElasticClient targetElasticClient = useInMemoryIndex  ? _elasticClientInMemory : _elasticClient;
+            IOpenSearchClient targetOpenSearchClient = useInMemoryIndex  ? _openSearchClientInMemory : _openSearchClient;
 
             MultiSearchRequest multiSearchRequest = BuildMultiSearchRequest(baseOrIdsQuery: baseOrIdsQuery, sourceCategories: sourceCategories, indexName: indexToUse,
                 includeScores: includeScores, maxConcurrent: maxConcurrentQueries);
 
-            IMultiSearchResponse topLevelResponse = targetElasticClient.MultiSearch(multiSearchRequest);  // TODO : Async?
+            MultiSearchResponse topLevelResponse = targetOpenSearchClient.MultiSearch(multiSearchRequest);  // TODO : Async?
 
             if(!topLevelResponse.IsValid)
             {
@@ -207,19 +206,19 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
         public void DeleteDocumentFromIndex(string documentId, bool useInMemoryIndex)
         {
             string targetIndex = useInMemoryIndex ? _inMemoryIndexName : _parameters.IndexDatabase;
-            DeleteRequest request = new DeleteRequest(targetIndex, typeof(T).Name.ToLowerInvariant(), documentId);
+            DeleteRequest request = new DeleteRequest(targetIndex, documentId);
              new Thread(() => 
                  {
                      // TODO: In high performance scenarios we don't want the caller
                      // to wait for confirmation.  But we do need to know about errors.
                      // Log delete error if it occurs and signal the caller.
-                     IDeleteResponse response = _elasticClient.Delete(request);
+                     DeleteResponse response = _openSearchClient.Delete(request);
                      //RaiseExceptionIfResponseIsInvalid(response);
                  }
              ).Start();
         }
 
-        private QueryContainer SetupSearchRequest(ElasticSearchParameters esSearchParams)
+        private QueryContainer SetupSearchRequest(OpenSearchParameters esSearchParams)
         {
             var booleanQuery = new BoolQuery();
             var mustContainer = new List<QueryContainer>();
@@ -301,7 +300,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
 
             foreach (var item in sortOptions)
             {
-                sort.Add(new SortField
+                sort.Add(new FieldSort
                 {
                     Field = item.Key,
                     Order = item.Value == ResultsSortOrder.Ascending ? SortOrder.Ascending : SortOrder.Descending
@@ -367,7 +366,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
 
                 var queryContainer = new QueryContainer[] { baseOrIdsQuery, categoryQuery };
 
-                var searchRequest = new SearchRequest<T>(indexName, Types.All)
+                var searchRequest = new SearchRequest<T>(indexName)
                 {
                     From = 0,
                     Size = 1,   // 1 presumably ?
@@ -390,14 +389,14 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
 
         public async Task<ISearchResponse<T>> ScrollAsync(int scrollTimeout, string scrollId)
         {
-            ISearchResponse<T> loopingResponse = await _elasticClient.ScrollAsync<T>(scrollTimeout, scrollId);
+            ISearchResponse<T> loopingResponse = await _openSearchClient.ScrollAsync<T>(scrollTimeout, scrollId);
 
             return loopingResponse;
         }
 
-        public async Task<IClearScrollResponse> ClearScroll(string scrollId)
+        public async Task<ClearScrollResponse> ClearScroll(string scrollId)
         {
-            IClearScrollResponse response = await _elasticClient.ClearScrollAsync(new ClearScrollRequest(scrollId));
+            ClearScrollResponse response = await _openSearchClient.ClearScrollAsync(new ClearScrollRequest(scrollId));
             return response;
         }
     }

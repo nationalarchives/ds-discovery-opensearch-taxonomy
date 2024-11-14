@@ -1,26 +1,22 @@
 ﻿using AutoMapper;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
+using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
-using Nest;
+using OpenSearch.Client;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
-
-
-    public class ElasticCategoryRepository :  AbstractElasticRespository<CategoryFromElastic>, ICategoryRepository
+    public class OpenSearchCategoryRepository :  AbstractOpenSearchRespository<CategoryFromOpenSearch>, ICategoryRepository
     {
         private const int MAX_CATEGORIES = 250;  //TODO: Probably get the count dynamically and cache.
-
         private static IList<Category> _categories;
 
-
-        public ElasticCategoryRepository(IConnectElastic<CategoryFromElastic> elasticConnection, IMapper mapper) : base(elasticConnection, mapper)
+        public OpenSearchCategoryRepository(IConnectOpenSearch<CategoryFromOpenSearch> openSearchConnection, IMapper mapper) : base(openSearchConnection, mapper)
         {
         }
         public long Count()
@@ -42,17 +38,17 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
 
             try
             {
-                var elasticParamsBuilder = new ElasticSearchParamsBuilder();
+                var openSearchParamsBuilder = new OpenSearchParamsBuilder();
 
-                var elasticParams = elasticParamsBuilder.GetElasticSearchParameters(pagingOffset: 0, pageSize: MAX_CATEGORIES);
+                var openSearchParams = openSearchParamsBuilder.GetOpenSearchParameters(pagingOffset: 0, pageSize: MAX_CATEGORIES);
 
-                ISearchResponse<CategoryFromElastic> elasticCategories = await _elasticConnection.SearchAsync(elasticParams);
+                ISearchResponse<CategoryFromOpenSearch> openSearchCategories = await _openSearchConnection.SearchAsync(openSearchParams);
 
                 var categories = new List<Category>();
 
-                foreach (var item in elasticCategories.Hits)
+                foreach (var item in openSearchCategories.Hits)
                 {
-                    CategoryFromElastic searchResult = item.Source;
+                    CategoryFromOpenSearch searchResult = item.Source;
                     var result = _mapper.Map<Category>(searchResult);
                     result.Score = item.Score.HasValue ? (double)item.Score : 0;
 

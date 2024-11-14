@@ -48,11 +48,11 @@ namespace NationalArchives.Taxonomy.Common.UnitTests
 
             var luceneHelperTools = new LuceneHelperTools(defaultField, analyzer, _queryFields);
 
-            var elasticCategoryRepository = new InMemoryCategoriserRepository(iaViewIndexAnalyser :analyzer, luceneHelperTools: luceneHelperTools, logger: null);
+            var openSearchCategoryRepository = new InMemoryCategoriserRepository(iaViewIndexAnalyser :analyzer, luceneHelperTools: luceneHelperTools, logger: null);
 
             InformationAssetView iaView = GetInformationAssetView();
 
-            IList<CategorisationResult> categorisationResults = elasticCategoryRepository.FindRelevantCategoriesForDocument(iaView, PopulateCategories());
+            IList<CategorisationResult> categorisationResults = openSearchCategoryRepository.FindRelevantCategoriesForDocument(iaView, PopulateCategories());
 
             Assert.IsNotNull(categorisationResults);
             Trace.WriteLine(categorisationResults.Count + " caetgories found to match.");
@@ -69,11 +69,11 @@ namespace NationalArchives.Taxonomy.Common.UnitTests
 
             var luceneHelperTools = new LuceneHelperTools(defaultField, analyzer, _queryFields);
 
-            var elasticCategoryRepository = new InMemoryCategoriserRepository( analyzer, luceneHelperTools: luceneHelperTools, logger: null);
+            var openSearchCategoryRepository = new InMemoryCategoriserRepository( analyzer, luceneHelperTools: luceneHelperTools, logger: null);
 
             InformationAssetView iaView = GetInformationAssetView();
 
-            IList<CategorisationResult> categorisationResults = elasticCategoryRepository.FindRelevantCategoriesForDocument(iaView, PopulateCategories());
+            IList<CategorisationResult> categorisationResults = openSearchCategoryRepository.FindRelevantCategoriesForDocument(iaView, PopulateCategories());
 
             Assert.IsNotNull(categorisationResults);
             Trace.WriteLine(categorisationResults.Count + " categories found to match.");
@@ -93,11 +93,11 @@ namespace NationalArchives.Taxonomy.Common.UnitTests
 
             var luceneHelperTools = new LuceneHelperTools(defaultField, analyzer, _queryFields);
 
-            var elasticCategoryRepository = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyzer, luceneHelperTools: luceneHelperTools, logger: null);
+            var openSearchCategoryRepository = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyzer, luceneHelperTools: luceneHelperTools, logger: null);
 
             InformationAssetView iaView = GetInformationAssetView();
 
-            IList<CategorisationResult> categorisationResults = elasticCategoryRepository.FindRelevantCategoriesForDocument(iaView, _listOfCategories);
+            IList<CategorisationResult> categorisationResults = openSearchCategoryRepository.FindRelevantCategoriesForDocument(iaView, _listOfCategories);
 
             Assert.IsNotNull(categorisationResults);
             Assert.IsFalse(categorisationResults.Count == 0);
@@ -116,11 +116,11 @@ namespace NationalArchives.Taxonomy.Common.UnitTests
 
             var luceneHelperTools = new LuceneHelperTools(defaultField, analyzer, _queryFields);
 
-            var elasticCategoryRepository = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyzer, luceneHelperTools: luceneHelperTools, logger: null);
+            var openSearchCategoryRepository = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyzer, luceneHelperTools: luceneHelperTools, logger: null);
 
             InformationAssetView iaView = GetInformationAssetView();
 
-            IList<CategorisationResult> categorisationResults = elasticCategoryRepository.FindRelevantCategoriesForDocument(iaView, _listOfCategories);
+            IList<CategorisationResult> categorisationResults = openSearchCategoryRepository.FindRelevantCategoriesForDocument(iaView, _listOfCategories);
 
             Assert.IsNotNull(categorisationResults);
             Assert.IsFalse(categorisationResults.Count == 0);

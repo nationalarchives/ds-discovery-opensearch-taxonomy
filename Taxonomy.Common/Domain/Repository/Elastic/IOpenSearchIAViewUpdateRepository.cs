@@ -3,9 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
-    public interface IElasticIAViewUpdateRepository
+    public interface IOpenSearchIAViewUpdateRepository
     {
         IaidWithCategories GetByDocReference(string docReference);
 

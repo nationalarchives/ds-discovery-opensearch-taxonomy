@@ -1,9 +1,9 @@
-﻿using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
+﻿using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using System;
 
 namespace NationalArchives.Taxonomy.Common.Service.Interface
 {
-    public interface IUpdateElasticService
+    public interface IUpdateOpenSearchService
     {
         void Init();
 

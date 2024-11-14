@@ -21,7 +21,7 @@ namespace NationalArchives.Taxonomy.Batch
 
         ISourceIaidInputQueueConsumer _iaidConsumer = Substitute.For<ISourceIaidInputQueueConsumer>();
 
-        IUpdateElasticService _updateElasticService = Substitute.For<IUpdateElasticService>();
+        IUpdateOpenSearchService _updateOpenSearchService = Substitute.For<IUpdateOpenSearchService>();
 
 
         //[TestMethod]

@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Nest;
-using Elasticsearch.Net;
-
-namespace NationalArchives.Taxonomy.Common.DataObjects.Elastic
+﻿namespace NationalArchives.Taxonomy.Common.DataObjects.OpenSearch
 {
-    public class CategoryFromElastic
+    public class CategoryFromOpenSearch
     {
         public string ID { get; set; } // i.e. Ciaid
         public string query_text { get; set; }

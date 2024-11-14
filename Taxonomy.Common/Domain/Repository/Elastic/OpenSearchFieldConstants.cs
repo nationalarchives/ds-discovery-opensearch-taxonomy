@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
-    internal static class ElasticFieldConstants
+    internal static class OpenSearchFieldConstants
     {
         public const string DESCRIPTION = "DESCRIPTION";
         public const string CATALOGUE_REFERENCE = "CATALOGUE_REFERENCE";

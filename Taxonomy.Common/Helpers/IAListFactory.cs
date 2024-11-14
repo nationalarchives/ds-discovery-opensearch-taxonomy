@@ -1,7 +1,9 @@
 ﻿using AutoMapper;
-using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
+using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain;
-using Nest;
+using OpenSearch.Client;
+
+//using Nest;
 using System.Collections.Generic;
 
 namespace NationalArchives.Taxonomy.Common.Helpers

@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.Domain.Queue;
-using NationalArchives.Taxonomy.Common.Domain.Repository.Elastic;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using NationalArchives.Taxonomy.Common.Helpers;
 using NationalArchives.Taxonomy.Common.Service.Interface;
 using System;
@@ -12,10 +12,10 @@ using System.Threading;
 
 namespace NationalArchives.Taxonomy.Common.Service.Impl
 {
-    public class UpdateElasticService : IUpdateElasticService
+    public class UpdateOpenSearchService : IUpdateOpenSearchService
     {
         private readonly IUpdateStagingQueueReceiver _interimUpdateQueue;
-        private readonly IElasticIAViewUpdateRepository _targetElasticRepository;
+        private readonly IOpenSearchIAViewUpdateRepository _targetOpenSearchRepository;
         private readonly Queue<IaidWithCategories> internalQueue = new Queue<IaidWithCategories>();
         private readonly uint _batchSize;
         private readonly int _queueFetchWaitTime;
@@ -30,17 +30,17 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
         public bool IsProcessingComplete { get => _isProcessingComplete; set => _isProcessingComplete = value; }
 
-        private DateTime _lastElasticUpdate = DateTime.Now;
+        private DateTime _lastOpenSearchUpdate = DateTime.Now;
 
-        public UpdateElasticService(IUpdateStagingQueueReceiver updateQueue, IElasticIAViewUpdateRepository targetElasticRepository, ILogger logger, uint batchSize = 1, uint queueFetchWaitTime = 1000)
+        public UpdateOpenSearchService(IUpdateStagingQueueReceiver updateQueue, IOpenSearchIAViewUpdateRepository targetOpenSearchRepository, ILogger logger, uint batchSize = 1, uint queueFetchWaitTime = 1000)
         {
-            if (updateQueue == null || targetElasticRepository == null)
+            if (updateQueue == null || targetOpenSearchRepository == null)
             {
-                throw new TaxonomyException("Input queue and target elastic repository are required.");
+                throw new TaxonomyException("Input queue and target Open Search repository are required.");
             }
 
             _interimUpdateQueue = updateQueue;
-            _targetElasticRepository = targetElasticRepository;
+            _targetOpenSearchRepository = targetOpenSearchRepository;
             _batchSize = batchSize;
             _queueFetchWaitTime = Convert.ToInt32(queueFetchWaitTime);
             _logger = logger;
@@ -121,12 +121,12 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
                     Thread.Sleep(_queueFetchWaitTime);
 
-                    TimeSpan timeSinceLastUpdate = DateTime.Now - _lastElasticUpdate;
+                    TimeSpan timeSinceLastUpdate = DateTime.Now - _lastOpenSearchUpdate;
 
                     if (internalQueue.Count >= _batchSize || ((internalQueue.Count > 0) && timeSinceLastUpdate >= TimeSpan.FromMinutes(5)))
                     {
-                        _lastElasticUpdate = DateTime.Now;
-                        SubmitUpdatesToElasticDatabase();
+                        _lastOpenSearchUpdate = DateTime.Now;
+                        SubmitUpdatesToOpenSearchDatabase();
 
                     }
                     else
@@ -138,7 +138,8 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                             if (minutesSinceLastUpdate % 5 == 0 && minutesSinceLastUpdate > minutesSinceLastNoUpdatesLogMessage)
                             {
                                 minutesSinceLastNoUpdatesLogMessage = minutesSinceLastUpdate;
-                                _logger.LogInformation($"No Taxonomy updates have been received by the Elastic update service in the last {minutesSinceLastUpdate} minutes.  Resetting the update counter.");
+                                _logger.LogInformation($"No Taxonomy updates have been received by the Open Search" +
+                                    $" update service in the last {minutesSinceLastUpdate} minutes.  Resetting the update counter.");
                             } 
                         }
                     }
@@ -147,11 +148,11 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                     if (nullCounter >= NULL_COUNTER_THRESHOLD)
                     {
                         IsProcessingComplete = true;
-                        SubmitUpdatesToElasticDatabase();
-                        _logger.LogInformation("No more categorisation results found on update queue.  Elastic Update service will now finish processing.");
+                        SubmitUpdatesToOpenSearchDatabase();
+                        _logger.LogInformation("No more categorisation results found on update queue.  Open Search Update service will now finish processing.");
                     }
 
-                    void SubmitUpdatesToElasticDatabase()
+                    void SubmitUpdatesToOpenSearchDatabase()
                     {
                         if (_batchSize == 1 || internalQueue.Count == 1)
                         {
@@ -182,18 +183,18 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
             try
             {
-                _logger.LogInformation($"Submitting bulk update of {listOfIAViewUpdatesToProcess.Count} items to Elastic Search: ");
-                _targetElasticRepository.SaveAll(listOfIAViewUpdatesToProcess);
+                _logger.LogInformation($"Submitting bulk update of {listOfIAViewUpdatesToProcess.Count} items to Open Search: ");
+                _targetOpenSearchRepository.SaveAll(listOfIAViewUpdatesToProcess);
 
                 foreach (var item in listOfIAViewUpdatesToProcess)
                 {
-                    _logger.LogInformation($"Updated Elastic Search entry: {item.ToString()}".PadLeft(5));
+                    _logger.LogInformation($"Updated Open Search entry: {item.ToString()}".PadLeft(5));
                 }
 
                 int totalForThisBulkUpdateOperation = listOfIAViewUpdatesToProcess.Count;
-                _logger.LogInformation($"Completed bulk update in Elastic Search for {totalForThisBulkUpdateOperation} items: ");
+                _logger.LogInformation($"Completed bulk update in Open Search for {totalForThisBulkUpdateOperation} items: ");
                 _totalInfoAssetsUPdated += totalForThisBulkUpdateOperation;
-                _logger.LogInformation($" Category data for {_totalInfoAssetsUPdated} assets has now been added or updated in Elastic Search.");
+                _logger.LogInformation($" Category data for {_totalInfoAssetsUPdated} assets has now been added or updated in Open Search.");
             }
             catch (Exception e)
             {
@@ -205,9 +206,9 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
         {
             try
             {
-                _logger.LogInformation("Submitting single Asset update to Elastic Search: " + item.ToString());
-                _targetElasticRepository.Save(item);
-                _logger.LogInformation($"Completed single Asset in Elastic Search: {item.ToString()}." );
+                _logger.LogInformation("Submitting single Asset update to Open Search: " + item.ToString());
+                _targetOpenSearchRepository.Save(item);
+                _logger.LogInformation($"Completed single Asset in Open Search: {item.ToString()}." );
                 _totalInfoAssetsUPdated++;
             }
             catch (Exception)

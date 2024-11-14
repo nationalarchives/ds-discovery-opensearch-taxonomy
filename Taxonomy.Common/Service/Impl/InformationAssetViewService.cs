@@ -1,7 +1,7 @@
 ﻿using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.Domain;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
-using NationalArchives.Taxonomy.Common.Domain.Repository.Elastic;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -20,7 +20,7 @@ namespace NationalArchives.Taxonomy.Common.Service
             _useDfaultTaxonomyField = useDefaultTaxonomyFieldForApiSearch;
         }
 
-        public InformationAssetScrollList BrowseAllDocReferences(ElasticAssetBrowseParams browseParams,  string scrollId)
+        public InformationAssetScrollList BrowseAllDocReferences(OpenSearchAssetBrowseParams browseParams,  string scrollId)
         {
             try
             {
@@ -29,7 +29,7 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
             catch (Exception e)
             {
-                throw new TaxonomyException(TaxonomyErrorType.ELASTIC_INVALID_RESPONSE, "Error retrieving information asset IDs from Elastic Search", e);
+                throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_INVALID_RESPONSE, "Error retrieving information asset IDs from Elastic Search", e);
             }
         }
 

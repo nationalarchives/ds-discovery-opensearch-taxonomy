@@ -18,8 +18,8 @@ v1.4: Compilation changes from x64 to Any CPU for compatibiity with Elastic Sear
 v1.5: Updated Nuget Packages
 v1.6 Reverted Apache.NMS and Apache.NMS.ActiveMQ from v2.0 to 1.8 due to assembly ;pad/resolution/impelementation issues.</PackageReleaseNotes>
     <RepositoryUrl>https://tna.visualstudio.com/Discovery/_versionControl?path=$/Discovery/Projects/ActiveMQ</RepositoryUrl>
-    <PackageTags>ActiveMQ queue  elastic taxonomy</PackageTags>
-    <Copyright>"Copyright © The National Archives 2021"</Copyright>
+    <PackageTags>ActiveMQ queue Open Search taxonomy</PackageTags>
+    <Copyright>"Copyright © The National Archives 2024"</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <NeutralLanguage></NeutralLanguage>
     <AssemblyVersion>1.6.0.0</AssemblyVersion>

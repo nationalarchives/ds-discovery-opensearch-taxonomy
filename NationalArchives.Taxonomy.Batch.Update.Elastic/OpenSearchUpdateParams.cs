@@ -4,7 +4,7 @@ using System.Text;
 
 namespace NationalArchives.Taxonomy.Batch
 {
-    internal sealed class ElasticUpdateParams
+    internal sealed class OpenSearchUpdateParams
     {
         public uint  BulkUpdateBatchSize { get; set; }
 

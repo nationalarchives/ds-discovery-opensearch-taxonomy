@@ -6,17 +6,17 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace NationalArchives.Taxonomy.Batch.Update.Elastic.Service
+namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch.Service
 {
-    internal class UpdateElasticWindowsService : BackgroundService
+    internal class UpdateOpenSearchWindowsService : BackgroundService
     {
         private readonly IHostApplicationLifetime _hostApplicationLifetime;
-        private readonly IUpdateElasticService _updateElasticService;
-        private readonly ILogger<UpdateElasticWindowsService> _logger;
+        private readonly IUpdateOpenSearchService _updateOpenSearchService;
+        private readonly ILogger<UpdateOpenSearchWindowsService> _logger;
 
-        public UpdateElasticWindowsService(IUpdateElasticService updateElasticService, ILogger<UpdateElasticWindowsService> logger, IHostApplicationLifetime hostApplicationLifetime)
+        public UpdateOpenSearchWindowsService(IUpdateOpenSearchService updateOpenSearchService, ILogger<UpdateOpenSearchWindowsService> logger, IHostApplicationLifetime hostApplicationLifetime)
         {
-            _updateElasticService = updateElasticService;
+            _updateOpenSearchService = updateOpenSearchService;
             _logger = logger;
             _hostApplicationLifetime = hostApplicationLifetime;
         }
@@ -26,9 +26,9 @@ namespace NationalArchives.Taxonomy.Batch.Update.Elastic.Service
 
             try
             {
-                _logger.LogInformation(Properties.Resources.FlushRemaingUpdatesToElasticMsg);
-                _updateElasticService.Flush();
-                _logger.LogInformation("Stopping the Elastic Update Windows Service.");
+                _logger.LogInformation(Properties.Resources.FlushRemaingUpdatesToOpenSearchMsg);
+                _updateOpenSearchService.Flush();
+                _logger.LogInformation("Stopping the Open Search Update Windows Service.");
 
                 base.StopAsync(cancellationToken);
 
@@ -47,7 +47,7 @@ namespace NationalArchives.Taxonomy.Batch.Update.Elastic.Service
             _hostApplicationLifetime.ApplicationStopping.Register(OnStopping);
             _hostApplicationLifetime.ApplicationStopped.Register(OnStopped);
 
-            Task updateTask = Task.Run(() => _updateElasticService.Init());
+            Task updateTask = Task.Run(() => _updateOpenSearchService.Init());
             TaskAwaiter awaiter = updateTask.GetAwaiter();
 
             awaiter.OnCompleted(() => OutputCompletion(updateTask));
@@ -59,34 +59,33 @@ namespace NationalArchives.Taxonomy.Batch.Update.Elastic.Service
         {
             if (task.IsCanceled)
             {
-                _logger.LogInformation("Elastic search update service is stopping due to cancellation.");
+                _logger.LogInformation("Open Search update service is stopping due to cancellation.");
             }
             else if (task.IsFaulted)
             {
-                _logger.LogError("The Elastic search update service is stopping due to an exception.");
-
+                _logger.LogError("The Open Search update service is stopping due to an exception.");
             }
             else
             {
-                _logger.LogInformation("Processing of Elastic search updates completed.");
-                _logger.LogInformation("The Elastic search updates service is stopping.");
+                _logger.LogInformation("Processing of Open Search updates completed.");
+                _logger.LogInformation("The Open Search updates service is stopping.");
             }
             _hostApplicationLifetime.StopApplication();
         }
 
         private void OnStarted()
         {
-            _logger.LogInformation("Taxonomy Elastic Search Updates Service has started.");
+            _logger.LogInformation("Taxonomy Open Search Updates Service has started.");
         }
 
         private void OnStopping()
         {
-            _logger.LogInformation("Taxonomy Elastic Search Updates Service is stopping.");
+            _logger.LogInformation("Taxonomy Open Search Updates Service is stopping.");
         }
 
         private void OnStopped()
         {
-            _logger.LogInformation("Taxonomy Elastic Search Updates Service is stopped.");
+            _logger.LogInformation("Taxonomy Open Search Updates Service is stopped.");
         }
     }
 }

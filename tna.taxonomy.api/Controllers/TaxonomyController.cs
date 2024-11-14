@@ -86,7 +86,7 @@ namespace tna.taxonomy.api.Controllers
         {
             try
             {
-                var elasticBrowseparams = new ElasticAssetBrowseParams() { ScrollTimeout = scrollRequest.Timeout, PageSize = scrollRequest.PageSize };
+                var elasticBrowseparams = new OpenSearchAssetBrowseParams() { ScrollTimeout = scrollRequest.Timeout, PageSize = scrollRequest.PageSize };
                 var results = _iaViewService.BrowseAllDocReferences(elasticBrowseparams, scrollId: scrollRequest.ScrollId);
                 return Ok(results);
             }

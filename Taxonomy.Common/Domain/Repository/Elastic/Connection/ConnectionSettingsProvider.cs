@@ -1,15 +1,15 @@
 ﻿using Amazon;
 using Amazon.Runtime;
-using Elasticsearch.Net;
-using Elasticsearch.Net.Aws;
-using Nest;
-using Nest.JsonNetSerializer;
 using Newtonsoft.Json;
+using OpenSearch.Client;
+using OpenSearch.Client.JsonNetSerializer;
+using OpenSearch.Net;
+using OpenSearch.Net.Auth.AwsSigV4;
 using System;
 using System.Configuration;
 using System.Linq;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
     internal static class ConnectionSettingsProvider
     {
@@ -20,15 +20,15 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
 
         private static ConnectionSettings _connectionSettings;
 
-        public static ConnectionSettings GetConnectionSettings(ElasticConnectionParameters cParams)
+        public static ConnectionSettings GetConnectionSettings(OpenSearchConnectionParameters cParams)
         {
 
-            if (cParams.ElasticAwsParams?.UseAwsConnection ?? false)
+            if (cParams.OpenSearchAwsParams?.UseAwsConnection ?? false)
             {
-                string awsAccessKey = cParams.ElasticAwsParams.AccessKey;
-                string awsSecretKey = cParams.ElasticAwsParams.SecretKey;
-                string awsRoleArn = cParams.ElasticAwsParams.RoleArn;
-                string strRegion = cParams.ElasticAwsParams.Region;
+                string awsAccessKey = cParams.OpenSearchAwsParams.AccessKey;
+                string awsSecretKey = cParams.OpenSearchAwsParams.SecretKey;
+                string awsRoleArn = cParams.OpenSearchAwsParams.RoleArn;
+                string strRegion = cParams.OpenSearchAwsParams.Region;
 
                 if (new[] { awsAccessKey, awsSecretKey, awsRoleArn, strRegion }.Any(s => String.IsNullOrWhiteSpace(s)))
                 {
@@ -44,7 +44,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
                     throw new ConfigurationErrorsException(AWS_UNKNOWN_REGION);
                 }
 
-                using (IConnection httpConnection = new AwsHttpConnection(aWSAssumeRoleCredentials, awsRegion))
+                using (IConnection httpConnection = new AwsSigV4HttpConnection(aWSAssumeRoleCredentials, awsRegion))
                 {
                     using (IConnectionPool pool = new SingleNodeConnectionPool(cParams.Uri))
                     {

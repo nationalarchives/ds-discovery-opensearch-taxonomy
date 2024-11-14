@@ -1,26 +1,25 @@
 ﻿using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
-using Nest;
+using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
+using OpenSearch.Client;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
-    public class ElasticIAViewUpdateRepository : IElasticIAViewUpdateRepository
+    public class OpenSearchIAViewUpdateRepository : IOpenSearchIAViewUpdateRepository
     {
-        //private ElasticConnectionParameters _parameters;
-        private ElasticClient _elasticClient;
+        private OpenSearchClient _openSearchClient;
 
         //TODO: Not using the IConnectElastic interface here, it just seems to get in the way, look at refactoring generally.
         // But see where we get to on using Lucene.net and the InfoAseet input source.
-        public ElasticIAViewUpdateRepository(ElasticConnectionParameters elasticConnectionParameters)
+        public OpenSearchIAViewUpdateRepository(OpenSearchConnectionParameters openSearchConnectionParameters)
         {
-            using (ConnectionSettings connectionSettings = ConnectionSettingsProvider.GetConnectionSettings(elasticConnectionParameters))
+            using (ConnectionSettings connectionSettings = ConnectionSettingsProvider.GetConnectionSettings(openSearchConnectionParameters))
             {
                 connectionSettings.DefaultFieldNameInferrer(p => p);
-                _elasticClient = new ElasticClient(connectionSettings);
+                _openSearchClient = new OpenSearchClient(connectionSettings);
             };
         }
 
@@ -37,12 +36,12 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
             }
 
             var update = new { TAXONOMY_ID = iaidWithCategories.CategoryIds };
-            var response = _elasticClient.Update<ElasticRecordAssetView, object>(iaidWithCategories.Iaid, u => u.Doc(update).DocAsUpsert());
+            var response = _openSearchClient.Update<OpenSearchRecordAssetView, object>(iaidWithCategories.Iaid, u => u.Doc(update).DocAsUpsert());
             if(!response.IsValid)
             {
-                string errorInfo = GetElasticErrorINfo(response);
+                string errorInfo = GetOpenSearchErrorInfo(response);
 
-                throw new TaxonomyException(TaxonomyErrorType.ELASTIC_UPDATE_ERROR, errorInfo);
+                throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_UPDATE_ERROR, errorInfo);
             }
         }
 
@@ -50,7 +49,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
         {
             if(iaidsWithCategories == null)
             {
-                throw new TaxonomyException("No IAID list with categories supplied to the elastic search update service.");
+                throw new TaxonomyException("No IAID list with categories supplied to the Open search update service.");
             }
 
             var descriptor = new BulkDescriptor();
@@ -58,21 +57,21 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
             foreach (var iaidWithCategories in iaidsWithCategories)
             {
                 var doc = new { TAXONOMY_ID = iaidWithCategories.CategoryIds };
-                descriptor.Update<ElasticRecordAssetView, object>(u => u.Doc(doc).DocAsUpsert(true).Id(iaidWithCategories.Iaid));
+                descriptor.Update<OpenSearchRecordAssetView, object>(u => u.Doc(doc).DocAsUpsert(true).Id(iaidWithCategories.Iaid));
             }
 
             //TODO: Async?
-            var response = _elasticClient.BulkAsync(descriptor).Result;
+            var response = _openSearchClient.BulkAsync(descriptor).Result;
             if (!response.IsValid)
             {
-                string errorInfo = GetElasticErrorINfo(response);
-                throw new TaxonomyException(TaxonomyErrorType.ELASTIC_BULK_UPDATE_ERROR, errorInfo);
+                string errorInfo = GetOpenSearchErrorInfo(response);
+                throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_BULK_UPDATE_ERROR, errorInfo);
             }
         }
 
-        private String GetElasticErrorINfo(IResponse response)
+        private String GetOpenSearchErrorInfo(IResponse response)
         {
-            StringBuilder sb = new StringBuilder("Invalid update response from Elastic Search");
+            StringBuilder sb = new StringBuilder("Invalid update response from Open Search");
             sb.Append(Environment.NewLine);
 
             if (response.OriginalException != null)

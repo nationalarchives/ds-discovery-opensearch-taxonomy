@@ -1,5 +1,5 @@
 ﻿using NationalArchives.Taxonomy.Common.Domain;
-using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
+using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -13,6 +13,6 @@ namespace NationalArchives.Taxonomy.Common.Service
     {
         Task<PaginatedList<InformationAssetViewWithScore>> PerformSearch(String query, Double score, int limit, int offset, string strHeldBy = "TNA ");
 
-        InformationAssetScrollList BrowseAllDocReferences(ElasticAssetBrowseParams browseParams, string scrollId = null);
+        InformationAssetScrollList BrowseAllDocReferences(OpenSearchAssetBrowseParams browseParams, string scrollId = null);
     }
 }

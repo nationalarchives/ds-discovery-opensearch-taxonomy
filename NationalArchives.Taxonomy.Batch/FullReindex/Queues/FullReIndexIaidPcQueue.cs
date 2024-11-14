@@ -4,7 +4,7 @@ using System.Threading;
 namespace NationalArchives.Taxonomy.Batch.FullReindex.Queues
 {
     /// <summary>
-    /// Can be used if required to store IAIDs from a producer, e.g. an Elastic scroll cursor, if we need to fetch them this way
+    /// Can be used if required to store IAIDs from a producer, e.g. an Open Search scroll cursor, if we need to fetch them this way
     /// instead of using an existing queue.
     /// </summary>
     /// <typeparam name="T"></typeparam>

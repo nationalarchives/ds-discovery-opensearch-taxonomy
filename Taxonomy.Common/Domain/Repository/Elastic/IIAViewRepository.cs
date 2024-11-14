@@ -3,7 +3,7 @@ using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
     public interface IIAViewRepository
     {
@@ -12,6 +12,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
         Task<InformationAssetView> SearchDocByDocReference(string docReference);
 
         Task<IList<InformationAssetView>> SearchDocByMultipleDocReferences(string[] docReference);
-        InformationAssetScrollList BrowseAllDocReferences(ElasticAssetBrowseParams browseParams, string scrollCursor);
+        InformationAssetScrollList BrowseAllDocReferences(OpenSearchAssetBrowseParams browseParams, string scrollCursor);
     }
 }
