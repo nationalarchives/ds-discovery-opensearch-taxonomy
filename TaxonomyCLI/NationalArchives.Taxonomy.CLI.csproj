@@ -6,6 +6,7 @@
     <AssemblyName>NationalArchives.Taxonomy.CLI</AssemblyName>
     <RootNamespace>NationalArchives.Taxonomy.CLI</RootNamespace>
     <RuntimeIdentifiers>win-x64;win-x86</RuntimeIdentifiers>
+    <UserSecretsId>a3e63ff7-6874-4ea5-9823-e3b48647959e</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +17,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="6.0.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.1" />
   </ItemGroup>
 

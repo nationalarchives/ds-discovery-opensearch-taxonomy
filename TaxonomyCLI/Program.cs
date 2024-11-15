@@ -40,7 +40,8 @@ namespace NationalArchives.Taxonomy.CLI
                  .SetBasePath(Directory.GetCurrentDirectory())
                  .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                  .AddJsonFile($"appsettings.{environmentName}.json", optional: true, reloadOnChange: true)
-                 .AddEnvironmentVariables("TAXONOMY_");
+                 .AddEnvironmentVariables("TAXONOMY_")
+                 .AddUserSecrets<Program>();
 
                 var config = builder.Build();
                 IServiceProvider provider = ConfigureServices(config, args);

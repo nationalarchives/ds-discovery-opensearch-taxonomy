@@ -53,7 +53,8 @@ namespace NationalArchives.Taxonomy.Batch
                     serviceLogger.LogInformation("Starting the taxonomy generator.");
                 }
 
-                CreateHostBuilder(args).Build().Run();
+                var builder = CreateHostBuilder(args);
+                builder.Build().Run();
             }
             catch (Exception e)
             {
@@ -86,6 +87,7 @@ namespace NationalArchives.Taxonomy.Batch
                 }).ConfigureAppConfiguration((hostingContext, config) =>
                 {
                     config.AddEnvironmentVariables("TAXONOMY_");
+                    config.AddUserSecrets<Program>();
                 }).UseWindowsService();
 
         private static void ConfigureServicesForHost(HostBuilderContext context, IServiceCollection services)
@@ -104,7 +106,6 @@ namespace NationalArchives.Taxonomy.Batch
 
             CategorisationParams categorisationParams = config.GetSection(categorisationParamsConfigSource).Get<CategorisationParams>();
 
-
             services.AddAutoMapper(mc => mc.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }));
 
             services.AddSingleton<ILoggerFactory, LoggerFactory>();
@@ -120,15 +121,12 @@ namespace NationalArchives.Taxonomy.Batch
                 services.AddSingleton(typeof(ILogger<IUpdateStagingQueueSender>), typeof(Logger<ActiveMqUpdateSender>)); 
             }
 
-
             DiscoveryOpenSearchConnectionParameters discoveryOpenSearchConnParams = config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>();
            
-
             services.AddSingleton<CategorisationParams>(categorisationParams);
             // Need to add as a service as FullReindexService and DailyUpdate service are instantiated via AddHostedService where we can't pass parameters directly.
 
             CategoriserLuceneParams categoriserLuceneParams = config.GetSection("CategoriserLuceneParams").Get<CategoriserLuceneParams>();
-
 
             //params for update staging queue.
             UpdateStagingQueueParams updateStagingQueueParams = config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>();

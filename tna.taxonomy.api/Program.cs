@@ -12,6 +12,7 @@ using NationalArchives.Taxonomy.Common.Service;
 var builder = WebApplication.CreateBuilder(args);
 
 var config = builder.Configuration;
+config.AddEnvironmentVariables("TAXONOMY_");
 
 // Add services to the container.
 builder.Services.AddAutoMapper(mc => mc.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }));
@@ -27,7 +28,7 @@ builder.Services.AddScoped<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) 
     return recordAssetsElasticConnection;
 });
 
-CategorySource categorySource = (CategorySource)Enum.Parse(typeof(CategorySource), config.GetValue<string>("CategorySource"));
+ CategorySource categorySource = (CategorySource)Enum.Parse(typeof(CategorySource), config.GetValue<string>("CategorySource"));
 // Get the categories form either Mongo or Elastic
 switch (categorySource)
 {
