@@ -13,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 var config = builder.Configuration;
 config.AddEnvironmentVariables("TAXONOMY_");
+config.AddUserSecrets<Program>();
 
 // Add services to the container.
 builder.Services.AddAutoMapper(mc => mc.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }));

@@ -1,8 +1,4 @@
 ﻿using AutoMapper;
-using Nest;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
