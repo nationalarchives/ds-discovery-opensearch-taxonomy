@@ -179,7 +179,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
             while (!IsComplete() && !_token.IsCancellationRequested)
             {
-
                 if (_sendErrors.Count >= _maxSendErrors)
                 {
                     if (!_tcs.Task.IsFaulted) //Only one worker should set this as calling repeatedly causes an exception

@@ -179,7 +179,7 @@ namespace NationalArchives.Taxonomy.Batch
 
                 case CategorySource.Mongo:
                     //Mongo categories
-                    services.AddTransient<ICategoryRepository, MongoCategoryRepository>((ctx) =>
+                    services.AddSingleton<ICategoryRepository, MongoCategoryRepository>((ctx) =>
                     {
                         IMapper mapper = ctx.GetRequiredService<IMapper>();
                         MongoConnectionParams categoryDataMongoConnParams = config.GetSection("CategoryMongoParams").Get<MongoConnectionParams>();

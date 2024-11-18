@@ -7,16 +7,18 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Threading;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
 {
-    public sealed class MongoCategoryRepository : ICategoryRepository
+    public sealed class MongoCategoryRepository : ICategoryRepository, IDisposable
     {
         private static IList<Category> _categories;
         private readonly IMapper _mapper;
 
         private IMongoCollection<CategoryFromMongo> m_MongoCollection = null;
 
+        private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
 
         public MongoCategoryRepository(MongoConnectionParams mongoConnectionParams, IMapper mapper)
         {
@@ -49,52 +51,60 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
 
         public async Task<IList<Category>> FindAll()
         {
-            if (_categories != null)
-            {
-                return _categories;
-            }
-
+            await _semaphore.WaitAsync();
             try
             {
-                FilterDefinition<CategoryFromMongo> filter = FilterDefinition<CategoryFromMongo>.Empty;
-                var categories = new List<Category>();
-
-                using (IAsyncCursor<CategoryFromMongo> mongoCategoriesCursor = await m_MongoCollection.FindAsync<CategoryFromMongo>(filter))
+                if (_categories != null)
                 {
-                    while (await mongoCategoriesCursor.MoveNextAsync())
-                    {
-                        IEnumerable<CategoryFromMongo> batch = mongoCategoriesCursor.Current;
-                        foreach (CategoryFromMongo mongoCategory in batch)
-                        {
-                            Category category = _mapper.Map<Category>(mongoCategory);
+                    return _categories;
+                }
+                try
+                {
+                    FilterDefinition<CategoryFromMongo> filter = FilterDefinition<CategoryFromMongo>.Empty;
+                    var categories = new List<Category>();
 
-                            foreach (string s in new string []{category.Id, category.Query, category.Title })
+                    using (IAsyncCursor<CategoryFromMongo> mongoCategoriesCursor = await m_MongoCollection.FindAsync<CategoryFromMongo>(filter))
+                    {
+                        while (await mongoCategoriesCursor.MoveNextAsync())
+                        {
+                            IEnumerable<CategoryFromMongo> batch = mongoCategoriesCursor.Current;
+                            foreach (CategoryFromMongo mongoCategory in batch)
                             {
-                                if (String.IsNullOrWhiteSpace(s))
+                                Category category = _mapper.Map<Category>(mongoCategory);
+
+                                foreach (string s in new string[] { category.Id, category.Query, category.Title })
                                 {
-                                    throw new ApplicationException($"Error retreiving category data from Mongo Collection {m_MongoCollection.CollectionName()}, database {m_MongoCollection.DatabaseName()}, server {m_MongoCollection.Server()}.  Current Category: {category}.");
+                                    if (String.IsNullOrWhiteSpace(s))
+                                    {
+                                        throw new ApplicationException($"Error retreiving category data from Mongo Collection {m_MongoCollection.CollectionName()}, database {m_MongoCollection.DatabaseName()}, server {m_MongoCollection.Server()}.  Current Category: {category}.");
+                                    }
                                 }
+                                categories.Add(category);
                             }
-                            categories.Add(category);
                         }
                     }
-                }
 
-                if (categories.Count > 0)
-                {
-                    _categories = categories; 
-                }
-                else
-                {
-                    throw new ApplicationException($"Could not retrieve category information from Mongo collection {m_MongoCollection.CollectionName()}, database {m_MongoCollection.DatabaseName()}, server {m_MongoCollection.Server()}.");
-                }
+                    if (categories.Count > 0)
+                    {
+                        _categories = categories;
+                    }
+                    else
+                    {
+                        throw new ApplicationException($"Could not retrieve category information from Mongo collection {m_MongoCollection.CollectionName()}, database {m_MongoCollection.DatabaseName()}, server {m_MongoCollection.Server()}.");
+                    }
 
-                return categories;
+                    return categories;
+                }
+                catch (Exception ex)
+                {
+                    throw;
+                }
             }
-            catch (Exception ex)
+            finally
             {
-                throw;
+                _semaphore.Release();
             }
+
         }
 
         public Category FindByCiaid(string ciaid)
@@ -118,6 +128,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
         public void Save(Category category)
         {
             throw new NotImplementedException();
+        }
+
+        public void Dispose()
+        {
+            _semaphore?.Dispose();
         }
     }
 }
