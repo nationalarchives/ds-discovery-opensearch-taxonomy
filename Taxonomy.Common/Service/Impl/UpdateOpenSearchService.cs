@@ -171,7 +171,6 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                 throw;
             }
         }
-        
 
         private void BulkUpdateCategoriesOnIAViews(IList<IaidWithCategories> listOfIAViewUpdatesToProcess)
         {

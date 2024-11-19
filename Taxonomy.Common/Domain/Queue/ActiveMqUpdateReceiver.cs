@@ -113,7 +113,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
             if (nextBytesMessage != null)
             {
-                List<IaidWithCategories> nextBatchFromInterimQueue = IaidWithCategoriesSerialiser.IdxMessageToListOfIaidsWithCategories(nextBytesMessage);
+                byte[] bytes = nextBytesMessage.Content;
+                List<IaidWithCategories> nextBatchFromInterimQueue = IaidWithCategoriesSerialiser.IdxMessageToListOfIaidsWithCategories(bytes);
                 return nextBatchFromInterimQueue;
             }
             else

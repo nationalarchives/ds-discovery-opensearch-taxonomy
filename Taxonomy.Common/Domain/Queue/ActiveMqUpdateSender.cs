@@ -14,13 +14,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
     public class ActiveMqUpdateSender : IUpdateStagingQueueSender, IDisposable
     {
-
         private readonly ConnectionFactory _activeMqConnectionFactory;
         private readonly IConnection _activeMqConnection;
         private readonly ISession _activeMqSession;
         private readonly IDestination _activeMqdestination;
         private readonly IMessageProducer _activeMqProducer;
-
 
         private BlockingCollection<IaidWithCategories> _blockingCollection = new BlockingCollection<IaidWithCategories>();
         private CancellationToken _token = default;
@@ -176,7 +174,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         private void Consume1()
         {
 
-
             while (!IsComplete() && !_token.IsCancellationRequested)
             {
                 if (_sendErrors.Count >= _maxSendErrors)
@@ -191,7 +188,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
                 var currentBatch = new List<IaidWithCategories>(_batchSize);
 
-
                 for (int i = 0; i < _batchSize && (!IsComplete() && !_token.IsCancellationRequested); i++)
                 {
                     IaidWithCategories nextResult;
@@ -202,12 +198,12 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                     {
                         currentBatch.Add(nextResult);
                     }
-
                 }
 
                 if (currentBatch.Count > 0)
                 {
                     byte[] serialisedResults = currentBatch.ToByteArray();
+
                     try
                     {
                         var bytesMessage = _activeMqProducer.CreateBytesMessage(serialisedResults);

@@ -77,14 +77,10 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             }
             try
             {
-                //string itemString = JsonConvert.SerializeObject(item);
-                //var textMessage = m_Producer.CreateTextMessage(itemString);
-                // m_Producer.Send(textMessage);
-
-                byte[] serialisedResult = item.ToByteArray();
+                var itemAsList = new List<IaidWithCategories>() { item };
+                byte[] serialisedResult = itemAsList.ToByteArray();
                 var bytesMessage = m_Producer.CreateBytesMessage(serialisedResult);
                 m_Producer.Send(bytesMessage);
-
 
                 return true;
             }

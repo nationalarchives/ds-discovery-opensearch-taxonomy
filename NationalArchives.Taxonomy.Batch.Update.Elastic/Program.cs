@@ -65,6 +65,7 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch
                 }).ConfigureAppConfiguration((hostingContext, config) =>
                 {
                     config.AddEnvironmentVariables("TAXONOMY_");
+                    config.AddUserSecrets<Program>();
                 }).UseWindowsService();
 
 
