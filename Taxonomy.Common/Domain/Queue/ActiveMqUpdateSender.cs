@@ -91,7 +91,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             _updateQueueProgress = updateQueueProgress;
             _tcs = new TaskCompletionSource<bool>();
 
-            Timer notifcationTimer = new Timer(PrintUpdate, null, 60000, 60000) ;
+            Timer notificationTimer = new Timer(PrintUpdate, null, 60000, 60000) ;
 
             var tasks = new List<Task>();
 
@@ -112,7 +112,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             }
             finally
             {
-                notifcationTimer.Dispose();
+                notificationTimer?.Dispose();
             }
 
             _initialised = true;
