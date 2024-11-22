@@ -29,13 +29,13 @@
     <PackageReference Include="Microsoft.Extensions.Logging.EventLog" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.EventSource" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.TraceSource" Version="8.0.1" />
+    <PackageReference Include="NationalArchives.ActiveMQ" Version="1.7.0" />
     <PackageReference Include="NLog.Extensions.Logging" Version="5.3.14" />
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NationalArchives.ActiveMQ\NationalArchives.ActiveMQ.csproj" />
     <ProjectReference Include="..\Taxonomy.Common\NationalArchives.Taxonomy.Common.csproj" />
   </ItemGroup>
 

@@ -20,6 +20,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+    <PackageReference Include="NationalArchives.ActiveMQ" Version="1.7.0" />
   </ItemGroup>
 
   <ItemGroup>

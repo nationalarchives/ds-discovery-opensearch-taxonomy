@@ -27,8 +27,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NationalArchives.Taxonomy.C
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NationalArchives.Taxonomy.Common.UnitTests", "NationalArchives.Taxonomy.Common.UnitTests\NationalArchives.Taxonomy.Common.UnitTests.csproj", "{3A5974EC-387D-4390-A634-D4C965096854}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NationalArchives.ActiveMQ", "NationalArchives.ActiveMQ\NationalArchives.ActiveMQ.csproj", "{55F32EEA-1946-4B6B-99EF-50ACDB62FEB4}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -67,10 +65,6 @@ Global
 		{3A5974EC-387D-4390-A634-D4C965096854}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3A5974EC-387D-4390-A634-D4C965096854}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3A5974EC-387D-4390-A634-D4C965096854}.Release|Any CPU.Build.0 = Release|Any CPU
-		{55F32EEA-1946-4B6B-99EF-50ACDB62FEB4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{55F32EEA-1946-4B6B-99EF-50ACDB62FEB4}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{55F32EEA-1946-4B6B-99EF-50ACDB62FEB4}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{55F32EEA-1946-4B6B-99EF-50ACDB62FEB4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -84,7 +78,6 @@ Global
 		{C9CC5122-186B-4D60-B9CE-5A6522911446} = {30BB5F98-02D8-435D-9514-666E56332608}
 		{64383CD7-55BC-4F6C-9C31-5B60725F9B08} = {706FCBE1-11AB-4271-AE14-A7B58CCB4507}
 		{3A5974EC-387D-4390-A634-D4C965096854} = {706FCBE1-11AB-4271-AE14-A7B58CCB4507}
-		{55F32EEA-1946-4B6B-99EF-50ACDB62FEB4} = {706FCBE1-11AB-4271-AE14-A7B58CCB4507}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E0CFD241-AF85-4C51-ABE1-B03ACB6C3EA0}

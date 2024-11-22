@@ -15,6 +15,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.EventLog" Version="8.0.1" />
+    <PackageReference Include="NationalArchives.ActiveMQ" Version="1.7.0" />
     <PackageReference Include="NLog.Extensions.Logging" Version="5.3.14" />
   </ItemGroup>
 
