@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using Amazon;
+using Amazon.Runtime.Internal.Endpoints.StandardLibrary;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
@@ -23,6 +24,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         private readonly IDestination m_destination;
         private readonly IMessageConsumer m_Consumer;
 
+        private readonly AmazonSqsStagingQueueParams _qParams;    
+
         private AmazonSQSClient _client;
 
         public AmazonSqsUpdateReceiver(AmazonSqsStagingQueueParams qParams)
@@ -32,6 +35,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
                 throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, "Invalid or missing queue parameters for Amazon SQS");
             }
+
+            _qParams = qParams;
 
             try
             {
@@ -123,34 +128,59 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         public List<IaidWithCategories> DeQueueNextListOfIaidsWithCategories()
         {
-            IMessage nextItem;
-            IBytesMessage nextBytesMessage = null;
-            int attempts = 0;
+            //IMessage nextItem;
+            //IBytesMessage nextBytesMessage = null;
+            //int attempts = 0;
 
-            do
-            {
-                nextItem = m_Consumer.ReceiveNoWait();
-                if (nextItem != null)
-                {
-                    nextBytesMessage = nextItem as IBytesMessage;
+            //do
+            //{
+            //    nextItem = m_Consumer.ReceiveNoWait();
+            //    if (nextItem != null)
+            //    {
+            //        nextBytesMessage = nextItem as IBytesMessage;
                     
-                }
-                else
-                {
-                    attempts++;
-                }
-            } while (nextItem == null && attempts <= FETCH_RETRY_COUNT);
+            //    }
+            //    else
+            //    {
+            //        attempts++;
+            //    }
+            //} while (nextItem == null && attempts <= FETCH_RETRY_COUNT);
 
 
-            if (nextBytesMessage != null)
+            //if (nextBytesMessage != null)
+            //{
+            //    byte[] bytes = nextBytesMessage.Content;
+            //    List<IaidWithCategories> nextBatchFromInterimQueue = IaidWithCategoriesSerialiser.IdxMessageToListOfIaidsWithCategories(bytes);
+            //    return nextBatchFromInterimQueue;
+            //}
+            //else
+            //{
+            //    return null;
+            //}
+
+            //TODO - May be more performant to return multiple results i.e.  set MaxNumberOfMessages = 10 and return List or enumeration
+
+            // TODO
+            // Receive the message
+            // Process the message
+            // Delete the message 
+            var requestParams = new ReceiveMessageRequest
             {
-                byte[] bytes = nextBytesMessage.Content;
-                List<IaidWithCategories> nextBatchFromInterimQueue = IaidWithCategoriesSerialiser.IdxMessageToListOfIaidsWithCategories(bytes);
-                return nextBatchFromInterimQueue;
+                QueueUrl = _qParams.QueueUrl,
+                MaxNumberOfMessages = 1,
+                WaitTimeSeconds = TimeSpan.FromSeconds(10).Seconds,
+            };
+
+            //TODO - May be more performant to return multiple results i.e. 
+            ReceiveMessageResponse message = _client.ReceiveMessageAsync(requestParams).Result;
+            if (message.Messages.Count == 1)
+            {
+                List<IaidWithCategories> result = JsonConvert.DeserializeObject<List<IaidWithCategories>>(message.Messages[0].Body);
+                return result;
             }
             else
             {
-                return null;
+                throw new TaxonomyException("Unexpected message count");
             }
         }
     }

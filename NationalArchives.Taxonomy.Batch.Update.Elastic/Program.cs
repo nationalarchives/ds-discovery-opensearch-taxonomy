@@ -74,7 +74,10 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch
             IConfiguration config = context.Configuration;
 
             var openSearchUpdateParams = config.GetSection(nameof(OpenSearchUpdateParams)).Get<OpenSearchUpdateParams>();
-            var stagingQueueParams = config.GetSection(nameof(UpdateStagingQueueParams)).Get<UpdateStagingQueueParams>();
+
+            //var stagingQueueParams = config.GetSection(nameof(UpdateStagingQueueParams)).Get<UpdateStagingQueueParams>();
+            var stagingQueueParams = config.GetSection("AmazonSqsParams").Get<AmazonSqsStagingQueueParams>();
+
             var updateOpenSearchConnParams = config.GetSection(nameof(UpdateOpenSearchConnectionParameters)).Get<UpdateOpenSearchConnectionParameters>();
 
             services.AddSingleton(typeof(ILogger<UpdateOpenSearchWindowsService>), typeof(Logger<UpdateOpenSearchWindowsService>));
@@ -84,7 +87,7 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch
             //Staging queue for updates.  Needs to be a singleton or we get multiple consumers!
             services.AddSingleton<IUpdateStagingQueueReceiver>((ctx) =>
             {
-                return new ActiveMqUpdateReceiver(stagingQueueParams);
+                return new AmazonSqsUpdateReceiver(stagingQueueParams);
             });
 
             services.AddTransient<IOpenSearchIAViewUpdateRepository, OpenSearchIAViewUpdateRepository>((ctx) =>
