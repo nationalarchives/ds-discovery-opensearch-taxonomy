@@ -1,16 +1,21 @@
-﻿using Apache.NMS;
+﻿using Amazon.Runtime;
+using Amazon.SQS.Model;
+using Amazon.SQS;
+using Apache.NMS;
 using Apache.NMS.ActiveMQ;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.Helpers;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using Amazon;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
     public class AmazonSqsUpdateReceiver : IUpdateStagingQueueReceiver, IDisposable
     {
         private const int FETCH_RETRY_COUNT = 5;
+        private const string ROLE_SESSION_NAME = "Taxonomy_SQS_Update";
 
         private readonly ConnectionFactory m_ConnectionFactory;
         private readonly IConnection m_Connection;
@@ -18,35 +23,61 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         private readonly IDestination m_destination;
         private readonly IMessageConsumer m_Consumer;
 
-        public AmazonSqsUpdateReceiver(UpdateStagingQueueParams qParams)
+        private AmazonSQSClient _client;
+
+        public AmazonSqsUpdateReceiver(AmazonSqsStagingQueueParams qParams)
         {
 
-            if(qParams == null || String.IsNullOrEmpty(qParams.QueueName) || String.IsNullOrEmpty(qParams.Uri))
+            if(qParams == null || String.IsNullOrEmpty(qParams.QueueUrl))
             {
-                throw new TaxonomyException(TaxonomyErrorType.JMS_EXCEPTION, "Invalid or missing queue parameters for Active MQ");
+                throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, "Invalid or missing queue parameters for Amazon SQS");
             }
 
             try
             {
-                m_ConnectionFactory = new ConnectionFactory(qParams.Uri);
-                if (!String.IsNullOrWhiteSpace(qParams.UserName) && !String.IsNullOrWhiteSpace(qParams.Password))
+                //m_ConnectionFactory = new ConnectionFactory(qParams.Uri);
+                //if (!String.IsNullOrWhiteSpace(qParams.UserName) && !String.IsNullOrWhiteSpace(qParams.Password))
+                //{
+                //    m_Connection = m_ConnectionFactory.CreateConnection(qParams.UserName, qParams.Password);
+                //}
+                //else
+                //{ 
+                //    m_Connection = m_ConnectionFactory.CreateConnection(); 
+                //}
+                //m_Connection.Start();
+                //m_Session = m_Connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+                //m_destination = m_Session.GetQueue(qParams.QueueName);
+                //m_Consumer = m_Session.CreateConsumer(m_destination);
+
+                RegionEndpoint region = RegionEndpoint.GetBySystemName(qParams.Region);
+
+                if (!qParams.UseIntegratedSecurity)
                 {
-                    m_Connection = m_ConnectionFactory.CreateConnection(qParams.UserName, qParams.Password);
+                    AWSCredentials credentials = null;
+
+                    if (!String.IsNullOrEmpty(qParams.SessionToken))
+                    {
+                        credentials = new SessionAWSCredentials(awsAccessKeyId: qParams.AccessKey, awsSecretAccessKey: qParams.SecretKey, qParams.SessionToken);
+                    }
+                    else
+                    {
+                        credentials = new BasicAWSCredentials(accessKey: qParams.AccessKey, secretKey: qParams.SecretKey);
+                    }
+
+                    AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, qParams.RoleArn, ROLE_SESSION_NAME);
+
+                    _client = new AmazonSQSClient(aWSAssumeRoleCredentials, region);
                 }
                 else
-                { 
-                    m_Connection = m_ConnectionFactory.CreateConnection(); 
+                {
+                    _client = new AmazonSQSClient(region);
                 }
-                m_Connection.Start();
-                m_Session = m_Connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                m_destination = m_Session.GetQueue(qParams.QueueName);
-                m_Consumer = m_Session.CreateConsumer(m_destination);
 
             }
             catch (Exception e)
             {
                 Dispose();
-                throw new TaxonomyException(TaxonomyErrorType.JMS_EXCEPTION, $"Error establishing a connection to ActiveMQ {qParams.QueueName}, at {qParams.Uri}", e);
+                throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, $"Error establishing a connection to Amazon SQS {qParams.QueueUrl}.", e);
             }
         }
 
