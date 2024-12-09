@@ -1,7 +1,13 @@
-﻿using Apache.NMS;
+﻿using Amazon;
+using Amazon.Runtime;
+using Amazon.SQS;
+using Amazon.SQS.Model;
+using Apache.NMS;
 using Apache.NMS.ActiveMQ;
+using Microsoft.Extensions.Logging;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.Helpers;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -19,33 +25,41 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         private bool _addingCompleted;
 
+        private readonly AmazonSqsStagingQueueParams _qParams;
+        private readonly ILogger<IUpdateStagingQueueSender> _logger;
+
+        private const string ROLE_SESSION_NAME = "Taxonomy_SQS_Update_FULL_DAILY_UPDATE";
+
         /// <summary>
         /// Implementation of IUpdateStagingQueueSender where updates are sent
         /// directly to an ActiveMQ instance.
         /// </summary>
         /// <param name="qParams"></param>
-        public AmazonSqsDirectUpdateSender(UpdateStagingQueueParams qParams)
+        public AmazonSqsDirectUpdateSender(AmazonSqsStagingQueueParams qParams, ILogger<IUpdateStagingQueueSender> logger)
         {
             if(!qParams.PostUpdates)
             {
                 return;
             }
 
-            m_ConnectionFactory = new ConnectionFactory(qParams.Uri);
+            _qParams = qParams;
+            _logger = logger;   
 
-            if (!String.IsNullOrWhiteSpace(qParams.UserName) && !String.IsNullOrWhiteSpace(qParams.Password))
-            {
-                m_Connection = m_ConnectionFactory.CreateConnection(qParams.UserName, qParams.Password);
-            }
-            else
-            {
-                m_Connection = m_ConnectionFactory.CreateConnection();
-            }
+            //m_ConnectionFactory = new ConnectionFactory(qParams.Uri);
 
-            m_Connection.Start();
-            m_Session = m_Connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-            m_destination = m_Session.GetQueue(qParams.QueueName);
-            m_Producer = m_Session.CreateProducer(m_destination);
+            //if (!String.IsNullOrWhiteSpace(qParams.UserName) && !String.IsNullOrWhiteSpace(qParams.Password))
+            //{
+            //    m_Connection = m_ConnectionFactory.CreateConnection(qParams.UserName, qParams.Password);
+            //}
+            //else
+            //{
+            //    m_Connection = m_ConnectionFactory.CreateConnection();
+            //}
+
+            //m_Connection.Start();
+            //m_Session = m_Connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+            //m_destination = m_Session.GetQueue(qParams.QueueName);
+            //m_Producer = m_Session.CreateProducer(m_destination);
         }
 
 
@@ -61,10 +75,10 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         /// <returns>Returns true for compatibility with other possible queue implemnenations on the same interface</returns>
         public bool Enqueue(IaidWithCategories item, CancellationToken token)
         {
-            if(m_Producer == null)
-            {
-                return false;
-            }
+            //if(m_Producer == null)
+            //{
+            //    return false;
+            //}
 
             if(token.IsCancellationRequested)
             {
@@ -78,9 +92,44 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             try
             {
                 var itemAsList = new List<IaidWithCategories>() { item };
-                byte[] serialisedResult = itemAsList.ToByteArray();
-                var bytesMessage = m_Producer.CreateBytesMessage(serialisedResult);
-                m_Producer.Send(bytesMessage);
+                //byte[] serialisedResult = itemAsList.ToByteArray();
+                //var bytesMessage = m_Producer.CreateBytesMessage(serialisedResult);
+                //m_Producer.Send(bytesMessage);
+
+                AmazonSQSClient client;
+                RegionEndpoint region = RegionEndpoint.GetBySystemName(_qParams.Region);
+
+                if (!_qParams.UseIntegratedSecurity)
+                {
+                    AWSCredentials credentials = null;
+
+                    if (!String.IsNullOrEmpty(_qParams.SessionToken))
+                    {
+                        credentials = new SessionAWSCredentials(awsAccessKeyId: _qParams.AccessKey, awsSecretAccessKey: _qParams.SecretKey, _qParams.SessionToken);
+                    }
+                    else
+                    {
+                        credentials = new BasicAWSCredentials(accessKey: _qParams.AccessKey, secretKey: _qParams.SecretKey);
+                    }
+
+
+                    AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, _qParams.RoleArn, ROLE_SESSION_NAME);
+
+                    client = new AmazonSQSClient(aWSAssumeRoleCredentials, region);
+                }
+                else
+                {
+                    client = new AmazonSQSClient(region);
+                }
+
+                var request = new SendMessageRequest()
+                {
+                    MessageBody = JsonConvert.SerializeObject(itemAsList),
+                    QueueUrl = _qParams.QueueUrl,
+                };
+
+                var awaiter = client.SendMessageAsync(request).GetAwaiter();
+                var result = awaiter.GetResult();
 
                 return true;
             }

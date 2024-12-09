@@ -12,11 +12,15 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
+using Amazon.Runtime;
+using Amazon;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
     public class AmazonSqsUpdateSender : IUpdateStagingQueueSender, IDisposable
     {
+        private const string ROLE_SESSION_NAME = "Taxonomy_SQS_Update_FULL_REINDEX";
+
         private readonly ConnectionFactory _activeMqConnectionFactory;
         private readonly IConnection _activeMqConnection;
         private readonly ISession _activeMqSession;
@@ -38,37 +42,38 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         Action<int, int> _updateQueueProgress;
 
-        private ILogger<IUpdateStagingQueueSender> _logger;
+        private readonly ILogger<IUpdateStagingQueueSender> _logger;
         private bool _verboseLoggingEnabled;
 
         private ThreadLocal<int> _workerResultCount = new ThreadLocal<int>();
         private ThreadLocal<int> _workerMessageCount = new ThreadLocal<int>();
 
+        private readonly AmazonSqsStagingQueueParams _qParams;
+
         private bool _initialised;
 
-        public AmazonSqsUpdateSender(UpdateStagingQueueParams qParams, ILogger<IUpdateStagingQueueSender> logger)
+        public AmazonSqsUpdateSender(AmazonSqsStagingQueueParams qParams, ILogger<IUpdateStagingQueueSender> logger)
         {
-            if (qParams == null || String.IsNullOrEmpty(qParams.QueueName) || String.IsNullOrEmpty(qParams.Uri))
-            {
-                throw new TaxonomyException(TaxonomyErrorType.JMS_EXCEPTION, "Invalid or missing queue parameters for Active MQ");
-            }
-
             try
             {
-                _activeMqConnectionFactory = new ConnectionFactory(qParams.Uri);
-                if (!String.IsNullOrWhiteSpace(qParams.UserName) && !String.IsNullOrWhiteSpace(qParams.Password))
+                if (qParams == null || String.IsNullOrEmpty(qParams.QueueUrl))
                 {
-                    _activeMqConnection = _activeMqConnectionFactory.CreateConnection(qParams.UserName, qParams.Password);
+                    throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, "Invalid or missing queue parameters for Amazon SQS");
                 }
-                else
-                {
-                    _activeMqConnection = _activeMqConnectionFactory.CreateConnection();
-                }
-                _activeMqConnection.Start();
-                _activeMqSession = _activeMqConnection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                _activeMqdestination = _activeMqSession.GetQueue(qParams.QueueName);
-                _activeMqProducer = _activeMqSession.CreateProducer(_activeMqdestination);
-
+                //    _activeMqConnectionFactory = new ConnectionFactory(qParams.Uri);
+                //    if (!String.IsNullOrWhiteSpace(qParams.UserName) && !String.IsNullOrWhiteSpace(qParams.Password))
+                //    {
+                //        _activeMqConnection = _activeMqConnectionFactory.CreateConnection(qParams.UserName, qParams.Password);
+                //    }
+                //    else
+                //    {
+                //        _activeMqConnection = _activeMqConnectionFactory.CreateConnection();
+                //    }
+                //    _activeMqConnection.Start();
+                //    _activeMqSession = _activeMqConnection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+                //    _activeMqdestination = _activeMqSession.GetQueue(qParams.QueueName);
+                //    _activeMqProducer = _activeMqSession.CreateProducer(_activeMqdestination);
+                _qParams = qParams;
                 _workerCount = Math.Max(qParams.WorkerCount, 1);
                 _maxSendErrors = qParams.MaxErrors;
                 _batchSize = Math.Max(qParams.BatchSize, 1);
@@ -79,7 +84,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             catch (Exception e)
             {
                 Dispose();
-                throw new TaxonomyException(TaxonomyErrorType.JMS_EXCEPTION, $"Error establishing a connection to ActiveMQ {qParams.QueueName}, at {qParams.Uri}", e);
+                throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, $"Error establishing a connection to Amazon SQS {qParams.QueueUrl}", e);
             }
         }
 
@@ -205,15 +210,47 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
                 if (currentBatch.Count > 0)
                 {
-                    var client = new AmazonSQSClient();
-                    var request = new SendMessageRequest()
+                    try
                     {
-                        //MessageBody = JsonSerializer.Serialize(currentBatch),
-                        MessageBody = JsonConvert.SerializeObject(currentBatch),
-                        QueueUrl = "https://sqs.ap-southeast-2.amazonaws.com/189107071895/youtube-demo"
-                    };
+                        AmazonSQSClient client;
+                        RegionEndpoint region = RegionEndpoint.GetBySystemName(_qParams.Region);
 
-                    var result = await client.SendMessageAsync(request);
+                        if (!_qParams.UseIntegratedSecurity)
+                        {
+                            AWSCredentials credentials = null;
+
+                            if (!String.IsNullOrEmpty(_qParams.SessionToken))
+                            {
+                                credentials = new SessionAWSCredentials(awsAccessKeyId: _qParams.AccessKey, awsSecretAccessKey: _qParams.SecretKey, _qParams.SessionToken); 
+                            }
+                            else
+                            {
+                                credentials = new BasicAWSCredentials(accessKey: _qParams.AccessKey, secretKey: _qParams.SecretKey); 
+                            }
+                            
+
+                            AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, _qParams.RoleArn, ROLE_SESSION_NAME);
+
+                            client = new AmazonSQSClient(aWSAssumeRoleCredentials, region); 
+                        }
+                        else
+                        {
+                            client = new AmazonSQSClient(region);
+                        }
+
+                        var request = new SendMessageRequest()
+                        {
+                            MessageBody = JsonConvert.SerializeObject(currentBatch),
+                            QueueUrl = _qParams.QueueUrl,
+                        };
+
+                        var result = await client.SendMessageAsync(request);
+                        Console.WriteLine(result);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw;
+                    }
                }
             }
 

@@ -118,7 +118,7 @@ namespace NationalArchives.Taxonomy.Batch
             services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
             if (_operationMode == OperationMode.Full_Reindex)
             {
-                services.AddSingleton(typeof(ILogger<IUpdateStagingQueueSender>), typeof(Logger<ActiveMqUpdateSender>)); 
+                services.AddSingleton(typeof(ILogger<IUpdateStagingQueueSender>), typeof(Logger<AmazonSqsUpdateSender>)); 
             }
 
             DiscoveryOpenSearchConnectionParameters discoveryOpenSearchConnParams = config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>();
@@ -129,8 +129,11 @@ namespace NationalArchives.Taxonomy.Batch
             CategoriserLuceneParams categoriserLuceneParams = config.GetSection("CategoriserLuceneParams").Get<CategoriserLuceneParams>();
 
             //params for update staging queue.
-            UpdateStagingQueueParams updateStagingQueueParams = config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>();
-            services.AddSingleton<UpdateStagingQueueParams>(updateStagingQueueParams);
+            //UpdateStagingQueueParams updateStagingQueueParams = config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>();
+            //services.AddSingleton<UpdateStagingQueueParams>(updateStagingQueueParams);
+
+            AmazonSqsStagingQueueParams awsSqsParams = config.GetSection("AmazonSqsParams").Get<AmazonSqsStagingQueueParams>();
+            services.AddSingleton<AmazonSqsStagingQueueParams>(awsSqsParams);
 
             // IAIDs connection info
             services.AddTransient<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) =>
@@ -218,16 +221,21 @@ namespace NationalArchives.Taxonomy.Batch
                 services.AddSingleton<IUpdateStagingQueueSender>((ctx) =>
                 {
                     var logger = ctx.GetRequiredService<ILogger<IUpdateStagingQueueSender>>();
-                    UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
-                    return new ActiveMqUpdateSender(qParams, logger);
+                    //UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                    //return new ActiveMqUpdateSender(qParams, logger);
+                    AmazonSqsStagingQueueParams qParams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
+                    return new AmazonSqsUpdateSender(qParams, logger);
                 }); 
             }
             else
             {
                 services.AddSingleton<IUpdateStagingQueueSender>((ctx) =>
                 {
-                    UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
-                    return new ActiveMqDirectUpdateSender(qParams);
+                    //UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                    //return new ActiveMqDirectUpdateSender(qParams);
+                    AmazonSqsStagingQueueParams qParams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
+                    var logger = ctx.GetRequiredService<ILogger<IUpdateStagingQueueSender>>();
+                    return new AmazonSqsDirectUpdateSender(qParams, logger);
                 });
             }
 

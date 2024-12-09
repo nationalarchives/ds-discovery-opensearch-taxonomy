@@ -40,6 +40,9 @@
          */
         JMS_EXCEPTION,
 
+        // Amazon SQS
+        SQS_EXCEPTION,
+
         /**
          * Document was not found in lucene Index
          */
