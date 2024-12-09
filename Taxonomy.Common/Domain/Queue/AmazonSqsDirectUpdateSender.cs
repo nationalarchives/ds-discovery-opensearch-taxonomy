@@ -92,9 +92,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             try
             {
                 var itemAsList = new List<IaidWithCategories>() { item };
-                //byte[] serialisedResult = itemAsList.ToByteArray();
-                //var bytesMessage = m_Producer.CreateBytesMessage(serialisedResult);
-                //m_Producer.Send(bytesMessage);
 
                 AmazonSQSClient client;
                 RegionEndpoint region = RegionEndpoint.GetBySystemName(_qParams.Region);
