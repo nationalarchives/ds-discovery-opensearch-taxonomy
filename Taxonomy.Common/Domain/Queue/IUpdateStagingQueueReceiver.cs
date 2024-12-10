@@ -5,13 +5,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
     public interface IUpdateStagingQueueReceiver
     {
-
-        IList<IaidWithCategories> DequeueIaidsWithCategories(int numberToFetch);
-
-        IaidWithCategories DeQueueNextIaidWithCategories();
-
-        List<IaidWithCategories> DeQueueNextListOfIaidsWithCategories();
-
         IAsyncEnumerable<List<IaidWithCategories>> IterateResults();
     }
 }

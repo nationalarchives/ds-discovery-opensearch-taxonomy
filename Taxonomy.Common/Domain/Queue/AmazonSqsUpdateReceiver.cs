@@ -72,64 +72,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             }
         }
 
-        public IList<IaidWithCategories> DequeueIaidsWithCategories(int numberToFetch)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IaidWithCategories DeQueueNextIaidWithCategories()
-        {
-
-            IMessage nextItem;
-            int attempts = 0;
-
-            do
-            {
-                nextItem = m_Consumer.ReceiveNoWait();
-                attempts++;
-            } while (nextItem == null && attempts <= FETCH_RETRY_COUNT);
-
-            ITextMessage msg = nextItem as ITextMessage;
-
-            if(msg != null)
-            {
-                IaidWithCategories iaidWithCategories = JsonConvert.DeserializeObject<IaidWithCategories>(msg.Text);
-                return iaidWithCategories;
-            }
-            else
-            {
-                return null;
-            }
-        }
-
-        public void Dispose()
-        {
-            m_Consumer?.Dispose();
-            m_Session?.Dispose();
-            m_Connection?.Dispose();
-        }
-
-        public List<IaidWithCategories> DeQueueNextListOfIaidsWithCategories()
-        {
-            var requestParams = new ReceiveMessageRequest
-            {
-                QueueUrl = _qParams.QueueUrl,
-                MaxNumberOfMessages = 1,
-                WaitTimeSeconds = TimeSpan.FromSeconds(10).Seconds,
-            };
-
-            ReceiveMessageResponse message = _client.ReceiveMessageAsync(requestParams).Result;
-            if (message.Messages.Count == 1)
-            {
-                List<IaidWithCategories> result = JsonConvert.DeserializeObject<List<IaidWithCategories>>(message.Messages[0].Body);
-                return result;
-            }
-            else
-            {
-                throw new TaxonomyException("Unexpected message count");
-            }
-        }
-
         public async IAsyncEnumerable<List<IaidWithCategories>> IterateResults()
         {
             var requestParams = new ReceiveMessageRequest
@@ -156,6 +98,13 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 await _client.DeleteMessageAsync(_qParams.QueueUrl, msg.ReceiptHandle);
                 yield return result;
             }
+        }
+
+        public void Dispose()
+        {
+            m_Consumer?.Dispose();
+            m_Session?.Dispose();
+            m_Connection?.Dispose();
         }
     }
 }
