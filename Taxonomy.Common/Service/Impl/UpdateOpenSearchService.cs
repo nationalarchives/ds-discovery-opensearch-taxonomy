@@ -62,7 +62,6 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                 _logger.LogError(sb.ToString());
                 throw;
             }
-            finally { Console.WriteLine("Done!"); }
         }
 
         public void Flush()
@@ -158,11 +157,11 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                     if (nullCounter >= NULL_COUNTER_THRESHOLD)
                     {
                         IsProcessingComplete = true;
-                        SubmitUpdatesToOpenSearchDatabase();
+                        await SubmitUpdatesToOpenSearchDatabase();
                         _logger.LogInformation("No more categorisation results found on update queue.  Open Search Update service will now finish processing.");
                     }
 
-                    void SubmitUpdatesToOpenSearchDatabase()
+                    async Task SubmitUpdatesToOpenSearchDatabase()
                     {
                         if (_batchSize == 1 || internalQueue.Count == 1)
                         {
@@ -171,7 +170,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                         else
                         {
                             var items = internalQueue.DequeueChunk<IaidWithCategories>(_batchSize).ToList();
-                            BulkUpdateCategoriesOnIAViews(items);
+                            await BulkUpdateCategoriesOnIAViews(items);
                         }
                     }
                 }
@@ -182,7 +181,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             }
         }
 
-        private void BulkUpdateCategoriesOnIAViews(IList<IaidWithCategories> listOfIAViewUpdatesToProcess)
+        private async Task BulkUpdateCategoriesOnIAViews(IList<IaidWithCategories> listOfIAViewUpdatesToProcess)
         {
 
             if(listOfIAViewUpdatesToProcess.Count == 0)
@@ -193,7 +192,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             try
             {
                 _logger.LogInformation($"Submitting bulk update of {listOfIAViewUpdatesToProcess.Count} items to Open Search: ");
-                _targetOpenSearchRepository.SaveAll(listOfIAViewUpdatesToProcess);
+                await _targetOpenSearchRepository.SaveAll(listOfIAViewUpdatesToProcess);
 
                 foreach (var item in listOfIAViewUpdatesToProcess)
                 {
@@ -205,22 +204,22 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                 _totalInfoAssetsUPdated += totalForThisBulkUpdateOperation;
                 _logger.LogInformation($" Category data for {_totalInfoAssetsUPdated} assets has now been added or updated in Open Search.");
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
                 throw;
             }
         }
 
-        private void UpdateCategoriesOnIAView(IaidWithCategories item)
+        private async Task UpdateCategoriesOnIAView(IaidWithCategories item)
         {
             try
             {
                 _logger.LogInformation("Submitting single Asset update to Open Search: " + item.ToString());
-                _targetOpenSearchRepository.Save(item);
+                await _targetOpenSearchRepository.Save(item);
                 _logger.LogInformation($"Completed single Asset in Open Search: {item.ToString()}." );
                 _totalInfoAssetsUPdated++;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 throw;
             }

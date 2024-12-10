@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
@@ -28,7 +29,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             throw new NotImplementedException();
         }
 
-        public void Save(IaidWithCategories iaidWithCategories)
+        public async Task Save(IaidWithCategories iaidWithCategories)
         {
             if (iaidWithCategories == null)
             {
@@ -36,7 +37,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             }
 
             var update = new { TAXONOMY_ID = iaidWithCategories.CategoryIds };
-            var response = _openSearchClient.Update<OpenSearchRecordAssetView, object>(iaidWithCategories.Iaid, u => u.Doc(update).DocAsUpsert());
+            var response = await _openSearchClient.UpdateAsync<OpenSearchRecordAssetView, object>(iaidWithCategories.Iaid, u => u.Doc(update).DocAsUpsert());
             if(!response.IsValid)
             {
                 string errorInfo = GetOpenSearchErrorInfo(response);
@@ -45,7 +46,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             }
         }
 
-        public void SaveAll(IEnumerable<IaidWithCategories> iaidsWithCategories)
+        public async Task SaveAll(IEnumerable<IaidWithCategories> iaidsWithCategories)
         {
             if(iaidsWithCategories == null)
             {
@@ -61,7 +62,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             }
 
             //TODO: Async?
-            var response = _openSearchClient.BulkAsync(descriptor).Result;
+            var response = await _openSearchClient.BulkAsync(descriptor);
             if (!response.IsValid)
             {
                 string errorInfo = GetOpenSearchErrorInfo(response);

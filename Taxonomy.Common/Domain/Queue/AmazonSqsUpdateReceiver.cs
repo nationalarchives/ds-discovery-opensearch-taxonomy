@@ -156,7 +156,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 await _client.DeleteMessageAsync(_qParams.QueueUrl, msg.ReceiptHandle);
                 yield return result;
             }
-            Console.WriteLine("Done");
         }
     }
 }
