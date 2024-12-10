@@ -129,11 +129,6 @@ namespace NationalArchives.Taxonomy.Batch.Service
                         _logger.LogError(msg);
                         _logger.LogError(iaidProducerTask.Exception.Message);
                         LogInnerExceptions(iaidProducerTask.Exception.InnerExceptions);
-                        //foreach (Exception inner in iaidProducerTask.Exception.InnerExceptions)
-                        //{
-                        //    //_logger.LogError($"Message: { iaidProducerTask.Exception.Message}, stack trace: { iaidProducerTask.Exception.StackTrace}");
-                        //    LogInnerExceptions()
-                        //}
                         StopApplication();
                     }
                     else if (iaidProducerTask.IsCanceled)
@@ -181,12 +176,8 @@ namespace NationalArchives.Taxonomy.Batch.Service
                         {
                             string msg = "Error updating the results queue. Please check the logs for errors";
                             _StopMessage = msg;
-                            _logger.LogError(msg);
-                            LogInnerExceptions(resultsQueueUpdateTask.Exception.InnerExceptions);
-                            //foreach (Exception inner in resultsQueueUpdateTask.Exception.InnerExceptions)
-                            //{
-                            //    _logger.LogError($"Message: { resultsQueueUpdateTask.Exception.Message}, stack trace: { resultsQueueUpdateTask.Exception.StackTrace}");
-                            //}
+                            _logger.LogError(resultsQueueUpdateTask.Exception, msg);
+                            LogInnerExceptions(resultsQueueUpdateTask.Exception.Flatten().InnerExceptions);
                             StopApplication();
                         }
 

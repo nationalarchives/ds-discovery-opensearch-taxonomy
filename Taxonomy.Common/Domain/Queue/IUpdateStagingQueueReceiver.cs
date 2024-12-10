@@ -11,5 +11,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         IaidWithCategories DeQueueNextIaidWithCategories();
 
         List<IaidWithCategories> DeQueueNextListOfIaidsWithCategories();
+
+        IAsyncEnumerable<List<IaidWithCategories>> IterateResults();
     }
 }

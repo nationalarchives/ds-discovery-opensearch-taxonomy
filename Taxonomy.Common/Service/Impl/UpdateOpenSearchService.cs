@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Service.Impl
 {
@@ -46,11 +47,11 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             _logger = logger;
         }
 
-        public void  Init()
+        public async Task Init()
         {
             try
             {
-                StartProcessing();
+                await StartProcessing();
             }
             catch (Exception e)
             {
@@ -61,6 +62,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                 _logger.LogError(sb.ToString());
                 throw;
             }
+            finally { Console.WriteLine("Done!"); }
         }
 
         public void Flush()
@@ -94,7 +96,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             }
         }
 
-        private void StartProcessing()
+        private async Task StartProcessing()
         {
             int nullCounter = 0;
             int minutesSinceLastNoUpdatesLogMessage = 0;
@@ -103,21 +105,29 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             {
                 while (!IsProcessingComplete)
                 {
-                    List<IaidWithCategories> nextBatchFromInterimUpdateQueue = _interimUpdateQueue.DeQueueNextListOfIaidsWithCategories();
-                    if (nextBatchFromInterimUpdateQueue != null)
+                    //List<IaidWithCategories> nextBatchFromInterimUpdateQueue = _interimUpdateQueue.DeQueueNextListOfIaidsWithCategories();
+                    var enumerator = _interimUpdateQueue.IterateResults().GetAsyncEnumerator();
+
+                    while (await enumerator.MoveNextAsync()) 
                     {
-                        foreach (var categorisationResultItem in nextBatchFromInterimUpdateQueue)
+                        List<IaidWithCategories> nextBatchOfResults = enumerator.Current;
+
+                        if (nextBatchOfResults.Count > 0)
                         {
-                            if (categorisationResultItem != null)
+                            foreach (IaidWithCategories categorisationResult in nextBatchOfResults) 
                             {
-                                internalQueue.Enqueue(categorisationResultItem);
+                                if (categorisationResult != null)
+                                {
+                                    internalQueue.Enqueue(categorisationResult);
+                                }
+                                else
+                                {
+                                    nullCounter++;
+                                }
                             }
-                        } 
+                        }
                     }
-                    else
-                    {
-                        nullCounter++;
-                    }
+
 
                     Thread.Sleep(_queueFetchWaitTime);
 
@@ -215,5 +225,6 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                 throw;
             }
         }
+
     }
 }

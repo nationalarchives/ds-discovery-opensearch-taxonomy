@@ -116,11 +116,7 @@ namespace NationalArchives.Taxonomy.Batch
             services.AddSingleton(typeof(ILogger<DailyUpdatesManagerService>), typeof(Logger<DailyUpdatesManagerService>));
             services.AddSingleton(typeof(ILogger<Analyzer>), typeof(Logger<Analyzer>));
             services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
-            if (_operationMode == OperationMode.Full_Reindex)
-            {
-                services.AddSingleton(typeof(ILogger<IUpdateStagingQueueSender>), typeof(Logger<AmazonSqsUpdateSender>)); 
-            }
-
+  
             DiscoveryOpenSearchConnectionParameters discoveryOpenSearchConnParams = config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>();
            
             services.AddSingleton<CategorisationParams>(categorisationParams);
@@ -279,7 +275,7 @@ namespace NationalArchives.Taxonomy.Batch
             {
                services.AddSingleton<FullReIndexIaidPcQueue<string>>((ctx) =>
                {
-                   UpdateStagingQueueParams qparams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                   var qparams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
                    return new FullReIndexIaidPcQueue<string>(qparams.MaxSize);
                }); // =>  FullReindexService
 

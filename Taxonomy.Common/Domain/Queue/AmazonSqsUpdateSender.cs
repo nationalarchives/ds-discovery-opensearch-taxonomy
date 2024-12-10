@@ -60,19 +60,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 {
                     throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, "Invalid or missing queue parameters for Amazon SQS");
                 }
-                //    _activeMqConnectionFactory = new ConnectionFactory(qParams.Uri);
-                //    if (!String.IsNullOrWhiteSpace(qParams.UserName) && !String.IsNullOrWhiteSpace(qParams.Password))
-                //    {
-                //        _activeMqConnection = _activeMqConnectionFactory.CreateConnection(qParams.UserName, qParams.Password);
-                //    }
-                //    else
-                //    {
-                //        _activeMqConnection = _activeMqConnectionFactory.CreateConnection();
-                //    }
-                //    _activeMqConnection.Start();
-                //    _activeMqSession = _activeMqConnection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                //    _activeMqdestination = _activeMqSession.GetQueue(qParams.QueueName);
-                //    _activeMqProducer = _activeMqSession.CreateProducer(_activeMqdestination);
+
                 _qParams = qParams;
                 _workerCount = Math.Max(qParams.WorkerCount, 1);
                 _maxSendErrors = qParams.MaxErrors;
@@ -88,11 +76,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             }
         }
 
-        public Task<bool> Init(CancellationToken token, Action<int, int> updateQueueProgress)
+        public async Task<bool> Init(CancellationToken token, Action<int, int> updateQueueProgress)
         {
             if(_initialised)
             {
-                return null;
+                return false;
             }
 
             _token = token;
@@ -111,12 +99,23 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                     tasks.Add(task);
                 }
 
+                var firstToComplete = await Task.WhenAny(tasks);
+                await firstToComplete;
+                if (_tcs.Task.IsFaulted) 
+                {
+                    throw _tcs.Task.Exception;
+                }
+
                 Task.WaitAll(tasks.ToArray());
                 _tcs.SetResult(_sendErrors.Count == 0 ? true : false);
             }
             catch (Exception ex)
             {
-                _tcs.TrySetException(ex);
+                if (!_tcs.Task.IsFaulted)
+                {
+                    _tcs.SetException(ex); 
+                }
+                return await _tcs.Task;
             }
             finally
             {
@@ -124,7 +123,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             }
 
             _initialised = true;
-            return _tcs.Task;
+            return await _tcs.Task;
         }
 
         private  void PrintUpdate(object data)
@@ -244,11 +243,21 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                             QueueUrl = _qParams.QueueUrl,
                         };
 
-                        var result = await client.SendMessageAsync(request);
-                        Console.WriteLine(result);
+                        //try
+                        //{
+
+                        SendMessageResponse result =  client.SendMessageAsync(request).Result;
+                        //}
+                        //catch (Exception)
+                        //{
+
+                        //    throw;
+                        //}
+                        //Console.WriteLine(result);
                     }
                     catch (Exception ex)
                     {
+                        _tcs.SetException(ex);
                         throw;
                     }
                }

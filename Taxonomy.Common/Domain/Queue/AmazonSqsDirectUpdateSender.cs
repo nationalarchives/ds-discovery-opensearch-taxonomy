@@ -28,7 +28,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         private readonly AmazonSqsStagingQueueParams _qParams;
         private readonly ILogger<IUpdateStagingQueueSender> _logger;
 
-        private const string ROLE_SESSION_NAME = "Taxonomy_SQS_Update_FULL_DAILY_UPDATE";
+        private const string ROLE_SESSION_NAME = "Taxonomy_SQS_Update";
 
         /// <summary>
         /// Implementation of IUpdateStagingQueueSender where updates are sent
@@ -44,22 +44,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
             _qParams = qParams;
             _logger = logger;   
-
-            //m_ConnectionFactory = new ConnectionFactory(qParams.Uri);
-
-            //if (!String.IsNullOrWhiteSpace(qParams.UserName) && !String.IsNullOrWhiteSpace(qParams.Password))
-            //{
-            //    m_Connection = m_ConnectionFactory.CreateConnection(qParams.UserName, qParams.Password);
-            //}
-            //else
-            //{
-            //    m_Connection = m_ConnectionFactory.CreateConnection();
-            //}
-
-            //m_Connection.Start();
-            //m_Session = m_Connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-            //m_destination = m_Session.GetQueue(qParams.QueueName);
-            //m_Producer = m_Session.CreateProducer(m_destination);
         }
 
 
@@ -72,14 +56,9 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         /// 
         /// </summary>
         /// <param name="item"></param>
-        /// <returns>Returns true for compatibility with other possible queue implemnenations on the same interface</returns>
+        /// <returns>Returns true for compatibility with other possible queue implemenations on the same interface</returns>
         public bool Enqueue(IaidWithCategories item, CancellationToken token)
         {
-            //if(m_Producer == null)
-            //{
-            //    return false;
-            //}
-
             if(token.IsCancellationRequested)
             {
                 return false;
@@ -108,7 +87,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                     {
                         credentials = new BasicAWSCredentials(accessKey: _qParams.AccessKey, secretKey: _qParams.SecretKey);
                     }
-
 
                     AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, _qParams.RoleArn, ROLE_SESSION_NAME);
 
@@ -155,6 +133,5 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         {
             _addingCompleted = true;
         }
-
     }
 }

@@ -40,20 +40,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
             try
             {
-                //m_ConnectionFactory = new ConnectionFactory(qParams.Uri);
-                //if (!String.IsNullOrWhiteSpace(qParams.UserName) && !String.IsNullOrWhiteSpace(qParams.Password))
-                //{
-                //    m_Connection = m_ConnectionFactory.CreateConnection(qParams.UserName, qParams.Password);
-                //}
-                //else
-                //{ 
-                //    m_Connection = m_ConnectionFactory.CreateConnection(); 
-                //}
-                //m_Connection.Start();
-                //m_Session = m_Connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                //m_destination = m_Session.GetQueue(qParams.QueueName);
-                //m_Consumer = m_Session.CreateConsumer(m_destination);
-
                 RegionEndpoint region = RegionEndpoint.GetBySystemName(qParams.Region);
 
                 if (!qParams.UseIntegratedSecurity)
@@ -116,9 +102,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             }
         }
 
-
-
- 
         public void Dispose()
         {
             m_Consumer?.Dispose();
@@ -128,42 +111,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         public List<IaidWithCategories> DeQueueNextListOfIaidsWithCategories()
         {
-            //IMessage nextItem;
-            //IBytesMessage nextBytesMessage = null;
-            //int attempts = 0;
-
-            //do
-            //{
-            //    nextItem = m_Consumer.ReceiveNoWait();
-            //    if (nextItem != null)
-            //    {
-            //        nextBytesMessage = nextItem as IBytesMessage;
-                    
-            //    }
-            //    else
-            //    {
-            //        attempts++;
-            //    }
-            //} while (nextItem == null && attempts <= FETCH_RETRY_COUNT);
-
-
-            //if (nextBytesMessage != null)
-            //{
-            //    byte[] bytes = nextBytesMessage.Content;
-            //    List<IaidWithCategories> nextBatchFromInterimQueue = IaidWithCategoriesSerialiser.IdxMessageToListOfIaidsWithCategories(bytes);
-            //    return nextBatchFromInterimQueue;
-            //}
-            //else
-            //{
-            //    return null;
-            //}
-
-            //TODO - May be more performant to return multiple results i.e.  set MaxNumberOfMessages = 10 and return List or enumeration
-
-            // TODO
-            // Receive the message
-            // Process the message
-            // Delete the message 
             var requestParams = new ReceiveMessageRequest
             {
                 QueueUrl = _qParams.QueueUrl,
@@ -171,7 +118,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 WaitTimeSeconds = TimeSpan.FromSeconds(10).Seconds,
             };
 
-            //TODO - May be more performant to return multiple results i.e. 
             ReceiveMessageResponse message = _client.ReceiveMessageAsync(requestParams).Result;
             if (message.Messages.Count == 1)
             {
@@ -182,6 +128,35 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
                 throw new TaxonomyException("Unexpected message count");
             }
+        }
+
+        public async IAsyncEnumerable<List<IaidWithCategories>> IterateResults()
+        {
+            var requestParams = new ReceiveMessageRequest
+            {
+                QueueUrl = _qParams.QueueUrl,
+                MaxNumberOfMessages = 10,
+                WaitTimeSeconds = TimeSpan.FromSeconds(10).Seconds,
+            };
+
+            ReceiveMessageResponse message = null;
+
+            try
+            {
+                message = await _client.ReceiveMessageAsync(requestParams);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+
+            foreach (Message msg in message.Messages)
+            {
+                List<IaidWithCategories> result = JsonConvert.DeserializeObject<List<IaidWithCategories>>(msg.Body);
+                await _client.DeleteMessageAsync(_qParams.QueueUrl, msg.ReceiptHandle);
+                yield return result;
+            }
+            Console.WriteLine("Done");
         }
     }
 }

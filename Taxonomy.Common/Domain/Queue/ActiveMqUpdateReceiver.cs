@@ -122,5 +122,10 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 return null;
             }
         }
+
+        public IAsyncEnumerable<List<IaidWithCategories>> IterateResults()
+        {
+            throw new NotImplementedException();
+        }
     }
 }
