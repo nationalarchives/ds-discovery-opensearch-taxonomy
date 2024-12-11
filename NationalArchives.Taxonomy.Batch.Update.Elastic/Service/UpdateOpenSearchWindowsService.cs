@@ -27,7 +27,7 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch.Service
             try
             {
                 _logger.LogInformation(Properties.Resources.FlushRemaingUpdatesToOpenSearchMsg);
-                _updateOpenSearchService.Flush();
+               _updateOpenSearchService.Flush().Wait(TimeSpan.FromMinutes(2));
                 _logger.LogInformation("Stopping the Open Search Update Windows Service.");
 
                 base.StopAsync(cancellationToken);
@@ -36,7 +36,7 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch.Service
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message);
+               _logger.LogError(e, "Exception occurre whilst attempting to stop the Taxonomy Update Service");
                 return Task.FromException(e);
             }
         }

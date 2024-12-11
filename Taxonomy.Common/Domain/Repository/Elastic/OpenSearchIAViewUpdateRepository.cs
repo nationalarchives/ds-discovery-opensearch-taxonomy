@@ -11,7 +11,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
     public class OpenSearchIAViewUpdateRepository : IOpenSearchIAViewUpdateRepository
     {
-        private OpenSearchClient _openSearchClient;
+        private readonly OpenSearchClient _openSearchClient;
 
         //TODO: Not using the IConnectElastic interface here, it just seems to get in the way, look at refactoring generally.
         // But see where we get to on using Lucene.net and the InfoAseet input source.
@@ -61,8 +61,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
                 descriptor.Update<OpenSearchRecordAssetView, object>(u => u.Doc(doc).DocAsUpsert(true).Id(iaidWithCategories.Iaid));
             }
 
-            //TODO: Async?
-            var response = await _openSearchClient.BulkAsync(descriptor);
+            BulkResponse response = await _openSearchClient.BulkAsync(descriptor);
             if (!response.IsValid)
             {
                 string errorInfo = GetOpenSearchErrorInfo(response);

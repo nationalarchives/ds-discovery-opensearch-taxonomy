@@ -1,10 +1,12 @@
-﻿using NationalArchives.Taxonomy.Common.BusinessObjects;
+﻿using Microsoft.Extensions.Logging;
+using NationalArchives.Taxonomy.Common.BusinessObjects;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
     public interface IUpdateStagingQueueReceiver
     {
-        IAsyncEnumerable<List<IaidWithCategories>> IterateResults();
+        Task<List<IaidWithCategories>> GetNextBatchOfResults(ILogger logger, int sqsRequestTimeoutSeconds);
     }
 }

@@ -96,14 +96,16 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch
 
             services.AddSingleton<IUpdateOpenSearchService>((ctx) =>
             {
-                uint bulkUpdateBatchSize = openSearchUpdateParams.BulkUpdateBatchSize;
-                uint queueFetchWaitTime = openSearchUpdateParams.QueueFetchSleepTime;
+                int bulkUpdateBatchSize = openSearchUpdateParams.BulkUpdateBatchSize;
+                int queueFetchWaitTime = openSearchUpdateParams.QueueFetchSleepTime;
+                int searchDatabaseUpdateInterval = openSearchUpdateParams.SearchDatabaseUpdateInterval;
+
                 Console.WriteLine($"Using a batch size of {bulkUpdateBatchSize} and a queue fetch interval of {queueFetchWaitTime} sceonds for Open Search bulk updates.");
 
                 IUpdateStagingQueueReceiver interimQueue = ctx.GetRequiredService<IUpdateStagingQueueReceiver>();  
                 IOpenSearchIAViewUpdateRepository updateRepo = ctx.GetRequiredService<IOpenSearchIAViewUpdateRepository>();
                 ILogger<UpdateOpenSearchService> logger = ctx.GetRequiredService<ILogger<UpdateOpenSearchService>>();
-                return new UpdateOpenSearchService(interimQueue, updateRepo, logger, bulkUpdateBatchSize, queueFetchWaitTime);
+                return new UpdateOpenSearchService(interimQueue, updateRepo, logger, bulkUpdateBatchSize, queueFetchWaitTime, searchDatabaseUpdateInterval);
             });
 
             services.AddHostedService<UpdateOpenSearchWindowsService>();

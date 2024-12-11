@@ -8,6 +8,6 @@ namespace NationalArchives.Taxonomy.Common.Service.Interface
     {
        Task Init();
 
-       void Flush();
+       Task Flush();
     }
 }

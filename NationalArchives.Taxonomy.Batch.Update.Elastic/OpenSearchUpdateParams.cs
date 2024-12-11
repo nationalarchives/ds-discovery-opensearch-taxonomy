@@ -6,8 +6,10 @@ namespace NationalArchives.Taxonomy.Batch
 {
     internal sealed class OpenSearchUpdateParams
     {
-        public uint  BulkUpdateBatchSize { get; set; }
+        public int  BulkUpdateBatchSize { get; set; }
 
-        public uint QueueFetchSleepTime { get; set; }
+        public int QueueFetchSleepTime { get; set; }
+
+        public int SearchDatabaseUpdateInterval { get; set; }
     }
 }
