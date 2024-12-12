@@ -11,5 +11,7 @@ namespace NationalArchives.Taxonomy.Batch
         public int QueueFetchSleepTime { get; set; }
 
         public int SearchDatabaseUpdateInterval { get; set; }
+
+        public int MaxInternalQueueSize { get; set; }
     }
 }

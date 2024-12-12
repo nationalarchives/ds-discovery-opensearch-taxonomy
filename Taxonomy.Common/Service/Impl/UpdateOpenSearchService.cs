@@ -21,6 +21,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
         private readonly int _batchSize;
         private readonly int _queueFetchWaitTimeMS;
         private readonly int _searchDatabaseUpdateIntervalMS;
+        private readonly int _maxInternalQueueSize;
         private readonly ILogger _logger;
 
         //private const int NULL_COUNTER_THRESHOLD = 259200;  // 259200 seconds == 3 days.
@@ -37,7 +38,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
     public bool IsProcessingComplete { get => _isProcessingComplete; set => _isProcessingComplete = value; }
 
         public UpdateOpenSearchService(IUpdateStagingQueueReceiver updateQueue, IOpenSearchIAViewUpdateRepository targetOpenSearchRepository, ILogger logger, 
-            int batchSize = 1, int queueFetchWaitTimeMS = 1000, int searchDatabaseUpdateIntervalMS = 10000)
+            int batchSize, int queueFetchWaitTimeMS, int searchDatabaseUpdateIntervalMS, int maxInternalQueueSize)
         {
             if (updateQueue == null || targetOpenSearchRepository == null)
             {
@@ -49,6 +50,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             _batchSize = batchSize;
             _queueFetchWaitTimeMS = queueFetchWaitTimeMS;
             _searchDatabaseUpdateIntervalMS = searchDatabaseUpdateIntervalMS;
+            _maxInternalQueueSize = maxInternalQueueSize;
             _logger = logger;
         }
 
@@ -102,8 +104,34 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
                 while (!IsProcessingComplete && !_cancelSource.IsCancellationRequested)
                 {
+                    List<IaidWithCategories> nextBatchOfResults = null;
 
-                    List<IaidWithCategories> nextBatchOfResults = await _interimUpdateQueue.GetNextBatchOfResults(_logger, sqsRequestTimeoutSeconds: 30);
+                    if (_internalQueue.Count < _maxInternalQueueSize)
+                    {
+                       nextBatchOfResults = await _interimUpdateQueue.GetNextBatchOfResults(_logger, sqsRequestTimeoutSeconds: 30); 
+                    }
+                    else
+                    {
+                        // wait for some more database updates to reduce the internal queue size
+
+                        do
+                        {
+                            int latestIniternalQueueSize = _internalQueue.Count;
+                            _logger.LogInformation($"Pausing fetch from SQS as the internal queue size is currently {latestIniternalQueueSize}. The configured maximum is {_maxInternalQueueSize}.");
+                            _logger.LogInformation($"Internal queue needs to reach target size of {_maxInternalQueueSize / 2} before resuming fetches from SQS. Will check again in 5 minutes for search database updates to reduce the queue");
+
+                            await Task.Delay(TimeSpan.FromMinutes(5));
+
+                            if (_internalQueue.Count >= latestIniternalQueueSize)
+                            {
+                                throw new Exception("Internal queue reached or exceeded the maximum size. It has not reduced despite pausing fetches from SQS to allow for database updates.  This indicates a possible issue with the database update process");
+                            }
+                        } while (_internalQueue.Count > (_maxInternalQueueSize / 2));
+
+                        _logger.LogInformation($"Internal queue size is now {_internalQueue.Count}.  Resuming fetch of taxonomy results from SQS.");
+                        nextBatchOfResults = await _interimUpdateQueue.GetNextBatchOfResults(_logger, sqsRequestTimeoutSeconds: 30);
+
+                    }
 
                     if (nextBatchOfResults != null)
                     {
