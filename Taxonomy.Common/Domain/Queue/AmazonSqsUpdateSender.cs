@@ -1,10 +1,11 @@
-﻿using Amazon.SQS.Model;
+﻿using Amazon;
+using Amazon.Runtime;
 using Amazon.SQS;
+using Amazon.SQS.Model;
 using Apache.NMS;
 using Apache.NMS.ActiveMQ;
 using Microsoft.Extensions.Logging;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.Helpers;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
@@ -12,8 +13,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
-using Amazon.Runtime;
-using Amazon;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {

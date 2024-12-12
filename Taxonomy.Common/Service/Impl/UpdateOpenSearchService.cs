@@ -8,7 +8,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -243,6 +242,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                 _logger.LogInformation($"Completed bulk update in Open Search for {totalForThisBulkUpdateOperation} items: ");
                 _totalInfoAssetsUpdated += totalForThisBulkUpdateOperation;
                 _logger.LogInformation($" Category data for {_totalInfoAssetsUpdated} assets has now been added or updated in Open Search.");
+                _logger.LogInformation($" There are currently {_internalQueue.Count} results on the internal queue that have been retrieved from Amazon SQS and are awaiting submission to the database.");
             }
             catch (Exception ex)
             {

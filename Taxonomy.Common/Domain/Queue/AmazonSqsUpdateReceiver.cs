@@ -1,20 +1,15 @@
-﻿using Amazon.Runtime;
-using Amazon.SQS.Model;
+﻿using Amazon;
+using Amazon.Runtime;
 using Amazon.SQS;
-using Apache.NMS;
-using Apache.NMS.ActiveMQ;
+using Amazon.SQS.Model;
+using Microsoft.Extensions.Logging;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.Helpers;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using Amazon;
-using Amazon.Runtime.Internal.Endpoints.StandardLibrary;
-using System.Threading.Tasks;
-using System.Threading;
-using Amazon.Runtime.Internal.Util;
-using Microsoft.Extensions.Logging;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {

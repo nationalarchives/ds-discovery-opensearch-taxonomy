@@ -6,7 +6,6 @@ using Apache.NMS;
 using Apache.NMS.ActiveMQ;
 using Microsoft.Extensions.Logging;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.Helpers;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
