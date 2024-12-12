@@ -1,12 +1,13 @@
 ﻿using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using System;
+using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Service.Interface
 {
     public interface IUpdateOpenSearchService
     {
-        void Init();
+       Task Init();
 
-        void Flush();
+       Task Flush();
     }
 }

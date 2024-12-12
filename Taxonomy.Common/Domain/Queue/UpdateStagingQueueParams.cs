@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace NationalArchives.Taxonomy.Common.Domain.Queue
+﻿namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
     public class UpdateStagingQueueParams
     {

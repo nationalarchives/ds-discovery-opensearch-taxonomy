@@ -2,8 +2,8 @@
 using NationalArchives.Taxonomy.Common.Domain;
 using NationalArchives.Taxonomy.Common.Domain.Queue;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
-using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Mongo;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using System;
 using System.Collections.Generic;
 using System.Linq;

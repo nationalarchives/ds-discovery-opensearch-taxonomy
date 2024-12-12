@@ -5,12 +5,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
     public class OpenSearchIAViewUpdateRepository : IOpenSearchIAViewUpdateRepository
     {
-        private OpenSearchClient _openSearchClient;
+        private readonly OpenSearchClient _openSearchClient;
 
         //TODO: Not using the IConnectElastic interface here, it just seems to get in the way, look at refactoring generally.
         // But see where we get to on using Lucene.net and the InfoAseet input source.
@@ -28,7 +29,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             throw new NotImplementedException();
         }
 
-        public void Save(IaidWithCategories iaidWithCategories)
+        public async Task Save(IaidWithCategories iaidWithCategories)
         {
             if (iaidWithCategories == null)
             {
@@ -36,7 +37,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             }
 
             var update = new { TAXONOMY_ID = iaidWithCategories.CategoryIds };
-            var response = _openSearchClient.Update<OpenSearchRecordAssetView, object>(iaidWithCategories.Iaid, u => u.Doc(update).DocAsUpsert());
+            var response = await _openSearchClient.UpdateAsync<OpenSearchRecordAssetView, object>(iaidWithCategories.Iaid, u => u.Doc(update).DocAsUpsert());
             if(!response.IsValid)
             {
                 string errorInfo = GetOpenSearchErrorInfo(response);
@@ -45,7 +46,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             }
         }
 
-        public void SaveAll(IEnumerable<IaidWithCategories> iaidsWithCategories)
+        public async Task SaveAll(IEnumerable<IaidWithCategories> iaidsWithCategories)
         {
             if(iaidsWithCategories == null)
             {
@@ -60,8 +61,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
                 descriptor.Update<OpenSearchRecordAssetView, object>(u => u.Doc(doc).DocAsUpsert(true).Id(iaidWithCategories.Iaid));
             }
 
-            //TODO: Async?
-            var response = _openSearchClient.BulkAsync(descriptor).Result;
+            BulkResponse response = await _openSearchClient.BulkAsync(descriptor);
             if (!response.IsValid)
             {
                 string errorInfo = GetOpenSearchErrorInfo(response);

@@ -14,9 +14,9 @@ using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Queue;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
-using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Lucene;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Mongo;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using NationalArchives.Taxonomy.Common.Service;
 using NLog.Extensions.Logging;
 using System;
@@ -116,11 +116,7 @@ namespace NationalArchives.Taxonomy.Batch
             services.AddSingleton(typeof(ILogger<DailyUpdatesManagerService>), typeof(Logger<DailyUpdatesManagerService>));
             services.AddSingleton(typeof(ILogger<Analyzer>), typeof(Logger<Analyzer>));
             services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
-            if (_operationMode == OperationMode.Full_Reindex)
-            {
-                services.AddSingleton(typeof(ILogger<IUpdateStagingQueueSender>), typeof(Logger<ActiveMqUpdateSender>)); 
-            }
-
+  
             DiscoveryOpenSearchConnectionParameters discoveryOpenSearchConnParams = config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>();
            
             services.AddSingleton<CategorisationParams>(categorisationParams);
@@ -129,8 +125,11 @@ namespace NationalArchives.Taxonomy.Batch
             CategoriserLuceneParams categoriserLuceneParams = config.GetSection("CategoriserLuceneParams").Get<CategoriserLuceneParams>();
 
             //params for update staging queue.
-            UpdateStagingQueueParams updateStagingQueueParams = config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>();
-            services.AddSingleton<UpdateStagingQueueParams>(updateStagingQueueParams);
+            //UpdateStagingQueueParams updateStagingQueueParams = config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>();
+            //services.AddSingleton<UpdateStagingQueueParams>(updateStagingQueueParams);
+
+            AmazonSqsStagingQueueParams awsSqsParams = config.GetSection("AmazonSqsParams").Get<AmazonSqsStagingQueueParams>();
+            services.AddSingleton<AmazonSqsStagingQueueParams>(awsSqsParams);
 
             // IAIDs connection info
             services.AddTransient<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) =>
@@ -218,16 +217,21 @@ namespace NationalArchives.Taxonomy.Batch
                 services.AddSingleton<IUpdateStagingQueueSender>((ctx) =>
                 {
                     var logger = ctx.GetRequiredService<ILogger<IUpdateStagingQueueSender>>();
-                    UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
-                    return new ActiveMqUpdateSender(qParams, logger);
+                    //UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                    //return new ActiveMqUpdateSender(qParams, logger);
+                    AmazonSqsStagingQueueParams qParams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
+                    return new AmazonSqsUpdateSender(qParams, logger);
                 }); 
             }
             else
             {
                 services.AddSingleton<IUpdateStagingQueueSender>((ctx) =>
                 {
-                    UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
-                    return new ActiveMqDirectUpdateSender(qParams);
+                    //UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                    //return new ActiveMqDirectUpdateSender(qParams);
+                    AmazonSqsStagingQueueParams qParams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
+                    var logger = ctx.GetRequiredService<ILogger<IUpdateStagingQueueSender>>();
+                    return new AmazonSqsDirectUpdateSender(qParams, logger);
                 });
             }
 
@@ -271,7 +275,7 @@ namespace NationalArchives.Taxonomy.Batch
             {
                services.AddSingleton<FullReIndexIaidPcQueue<string>>((ctx) =>
                {
-                   UpdateStagingQueueParams qparams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                   var qparams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
                    return new FullReIndexIaidPcQueue<string>(qparams.MaxSize);
                }); // =>  FullReindexService
 

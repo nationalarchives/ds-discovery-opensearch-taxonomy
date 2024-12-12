@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
@@ -9,8 +10,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
     {
         IaidWithCategories GetByDocReference(string docReference);
 
-        void Save(IaidWithCategories iaidWithCategories);
+        Task Save(IaidWithCategories iaidWithCategories);
 
-        void SaveAll(IEnumerable<IaidWithCategories> iaidsWithCategories);
+        Task SaveAll(IEnumerable<IaidWithCategories> iaidsWithCategories);
     }
 }

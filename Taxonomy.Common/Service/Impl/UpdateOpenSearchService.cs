@@ -5,34 +5,40 @@ using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using NationalArchives.Taxonomy.Common.Helpers;
 using NationalArchives.Taxonomy.Common.Service.Interface;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Service.Impl
 {
-    public class UpdateOpenSearchService : IUpdateOpenSearchService
+    public class UpdateOpenSearchService : IUpdateOpenSearchService, IDisposable
     {
         private readonly IUpdateStagingQueueReceiver _interimUpdateQueue;
         private readonly IOpenSearchIAViewUpdateRepository _targetOpenSearchRepository;
-        private readonly Queue<IaidWithCategories> internalQueue = new Queue<IaidWithCategories>();
-        private readonly uint _batchSize;
-        private readonly int _queueFetchWaitTime;
-
+        private readonly ConcurrentQueue<IaidWithCategories> _internalQueue = new ConcurrentQueue<IaidWithCategories>();
+        private readonly int _batchSize;
+        private readonly int _queueFetchWaitTimeMS;
+        private readonly int _searchDatabaseUpdateIntervalMS;
+        private readonly int _maxInternalQueueSize;
         private readonly ILogger _logger;
 
-        private const int NULL_COUNTER_THRESHOLD = 259200;  // 259200 seconds == 3 days.
+        //private const int NULL_COUNTER_THRESHOLD = 259200;  // 259200 seconds == 3 days.
+        private const int NULL_COUNTER_THRESHOLD = 72;  // Keep running for 3 days with 1 check per hour
+        private const int MAX_SEARCH_DB_UPDATE_ERRORS = 5;
 
         bool _isProcessingComplete = false;
 
-        private volatile int _totalInfoAssetsUPdated;
+        private volatile int _totalInfoAssetsUpdated;
 
-        public bool IsProcessingComplete { get => _isProcessingComplete; set => _isProcessingComplete = value; }
+        private CancellationTokenSource _cancelSource = new CancellationTokenSource();
+        private int _searchDatabaseUpdateErrors = 0;
 
-        private DateTime _lastOpenSearchUpdate = DateTime.Now;
+    public bool IsProcessingComplete { get => _isProcessingComplete; set => _isProcessingComplete = value; }
 
-        public UpdateOpenSearchService(IUpdateStagingQueueReceiver updateQueue, IOpenSearchIAViewUpdateRepository targetOpenSearchRepository, ILogger logger, uint batchSize = 1, uint queueFetchWaitTime = 1000)
+        public UpdateOpenSearchService(IUpdateStagingQueueReceiver updateQueue, IOpenSearchIAViewUpdateRepository targetOpenSearchRepository, ILogger logger, 
+            int batchSize, int queueFetchWaitTimeMS, int searchDatabaseUpdateIntervalMS, int maxInternalQueueSize)
         {
             if (updateQueue == null || targetOpenSearchRepository == null)
             {
@@ -42,28 +48,26 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             _interimUpdateQueue = updateQueue;
             _targetOpenSearchRepository = targetOpenSearchRepository;
             _batchSize = batchSize;
-            _queueFetchWaitTime = Convert.ToInt32(queueFetchWaitTime);
+            _queueFetchWaitTimeMS = queueFetchWaitTimeMS;
+            _searchDatabaseUpdateIntervalMS = searchDatabaseUpdateIntervalMS;
+            _maxInternalQueueSize = maxInternalQueueSize;
             _logger = logger;
         }
 
-        public void  Init()
+        public async Task Init()
         {
             try
             {
-                StartProcessing();
+                await StartProcessing(_cancelSource.Token);
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                StringBuilder sb = new StringBuilder("Exception Occurred: " + e.Message);
-                sb.Append("\n");
-                sb.Append("Stack Trace: \n");
-                sb.Append(e.StackTrace);
-                _logger.LogError(sb.ToString());
+                _logger.LogError(ex, "Exception whilst starting or running the Taxonomy Search database update process.");
                 throw;
             }
         }
 
-        public void Flush()
+        public async Task Flush()
         {
             List<IaidWithCategories> remainingInternalQueueItems = null;
 
@@ -71,21 +75,16 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             {
                 do
                 {
-                    remainingInternalQueueItems = internalQueue.DequeueChunk<IaidWithCategories>(_batchSize).ToList();
+                    remainingInternalQueueItems = _internalQueue.DequeueChunk<IaidWithCategories>(_batchSize).ToList();
                     if (remainingInternalQueueItems.Count > 0)
                     {
-                        BulkUpdateCategoriesOnIAViews(remainingInternalQueueItems);
+                        await BulkUpdateCategoriesOnIAViews(remainingInternalQueueItems);
                     }
                 } while (remainingInternalQueueItems.Count() > 0);
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                StringBuilder sb = new StringBuilder("Exception Occurred whilst flushing remaining updates: " + e.Message);
-                sb.Append("\n");
-                sb.Append("Stack Trace: \n");
-                sb.Append(e.StackTrace);
-
-                _logger.LogError(sb.ToString());
+                _logger.LogError(ex, "Exception Occurred whilst flushing remaining updates from the internal queue.");
                 throw;
             }
             finally
@@ -94,85 +93,162 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             }
         }
 
-        private void StartProcessing()
+        private async Task StartProcessing(CancellationToken token)
         {
             int nullCounter = 0;
-            int minutesSinceLastNoUpdatesLogMessage = 0;
 
             try
             {
-                while (!IsProcessingComplete)
+
+                Task searchDatabaseUpdateTask = Task.Run(() => PeriodicSearchDatabaseUpdateAsync(TimeSpan.FromMilliseconds(_searchDatabaseUpdateIntervalMS), token));
+
+                while (!IsProcessingComplete && !_cancelSource.IsCancellationRequested)
                 {
-                    List<IaidWithCategories> nextBatchFromInterimUpdateQueue = _interimUpdateQueue.DeQueueNextListOfIaidsWithCategories();
-                    if (nextBatchFromInterimUpdateQueue != null)
+                    List<IaidWithCategories> nextBatchOfResults = null;
+
+                    if (_internalQueue.Count < _maxInternalQueueSize)
                     {
-                        foreach (var categorisationResultItem in nextBatchFromInterimUpdateQueue)
+                       nextBatchOfResults = await _interimUpdateQueue.GetNextBatchOfResults(_logger, sqsRequestTimeoutSeconds: 30); 
+                    }
+                    else
+                    {
+                        // wait for some more database updates to reduce the internal queue size
+
+                        do
                         {
-                            if (categorisationResultItem != null)
+                            int latestIniternalQueueSize = _internalQueue.Count;
+                            _logger.LogInformation($"Pausing fetch from SQS as the internal queue size is currently {latestIniternalQueueSize}. The configured maximum is {_maxInternalQueueSize}.");
+                            _logger.LogInformation($"Internal queue needs to reach target size of {_maxInternalQueueSize / 2} before resuming fetches from SQS. Will check again in 5 minutes for search database updates to reduce the queue");
+
+                            await Task.Delay(TimeSpan.FromMinutes(5));
+
+                            if (_internalQueue.Count >= latestIniternalQueueSize)
                             {
-                                internalQueue.Enqueue(categorisationResultItem);
+                                throw new Exception("Internal queue reached or exceeded the maximum size. It has not reduced despite pausing fetches from SQS to allow for database updates.  This indicates a possible issue with the database update process");
                             }
-                        } 
-                    }
-                    else
-                    {
-                        nullCounter++;
-                    }
+                        } while (_internalQueue.Count > (_maxInternalQueueSize / 2));
 
-                    Thread.Sleep(_queueFetchWaitTime);
-
-                    TimeSpan timeSinceLastUpdate = DateTime.Now - _lastOpenSearchUpdate;
-
-                    if (internalQueue.Count >= _batchSize || ((internalQueue.Count > 0) && timeSinceLastUpdate >= TimeSpan.FromMinutes(5)))
-                    {
-                        _lastOpenSearchUpdate = DateTime.Now;
-                        SubmitUpdatesToOpenSearchDatabase();
+                        _logger.LogInformation($"Internal queue size is now {_internalQueue.Count}.  Resuming fetch of taxonomy results from SQS.");
+                        nextBatchOfResults = await _interimUpdateQueue.GetNextBatchOfResults(_logger, sqsRequestTimeoutSeconds: 30);
 
                     }
-                    else
+
+                    if (nextBatchOfResults != null)
                     {
-                        if (timeSinceLastUpdate >= TimeSpan.FromMinutes(5))
+
+                        if (nextBatchOfResults?.Count > 0)
                         {
-                            _totalInfoAssetsUPdated = 0;
-                            int minutesSinceLastUpdate = Convert.ToInt32(Math.Round(timeSinceLastUpdate.TotalMinutes));
-                            if (minutesSinceLastUpdate % 5 == 0 && minutesSinceLastUpdate > minutesSinceLastNoUpdatesLogMessage)
+                            foreach (IaidWithCategories categorisationResult in nextBatchOfResults)
                             {
-                                minutesSinceLastNoUpdatesLogMessage = minutesSinceLastUpdate;
-                                _logger.LogInformation($"No Taxonomy updates have been received by the Open Search" +
-                                    $" update service in the last {minutesSinceLastUpdate} minutes.  Resetting the update counter.");
-                            } 
-                        }
-                    }
-
-                    // this allows us to keep running for 3 days with no updates before shutting down the service, given the one second wait between each check.
-                    if (nullCounter >= NULL_COUNTER_THRESHOLD)
-                    {
-                        IsProcessingComplete = true;
-                        SubmitUpdatesToOpenSearchDatabase();
-                        _logger.LogInformation("No more categorisation results found on update queue.  Open Search Update service will now finish processing.");
-                    }
-
-                    void SubmitUpdatesToOpenSearchDatabase()
-                    {
-                        if (_batchSize == 1 || internalQueue.Count == 1)
-                        {
-                            UpdateCategoriesOnIAView(internalQueue.Dequeue());
+                                if (categorisationResult != null)
+                                {
+                                    _internalQueue.Enqueue(categorisationResult);
+                                }
+                            }
+                            await Task.Delay(_queueFetchWaitTimeMS);
                         }
                         else
                         {
-                            var items = internalQueue.DequeueChunk<IaidWithCategories>(_batchSize).ToList();
-                            BulkUpdateCategoriesOnIAViews(items);
+                            nullCounter++;
+
+                            // If we didn;t get anything back, Wait an hour before trying again...
+                            await Task.Delay(TimeSpan.FromHours(1));
+
+                            // this allows us to keep running for 3 days with no updates before shutting down the service, assuming a one hour wait between each check.
+                            if (nullCounter >= NULL_COUNTER_THRESHOLD)
+                            {
+                                IsProcessingComplete = true;
+                                await RetrieveAndSubmitUpdatesToOpenSearchDatabase();
+                                _cancelSource.Cancel();
+                                _logger.LogInformation("No more categorisation results found on update queue.  Open Search Update service will now finish processing.");
+                            }
                         }
                     }
-                }
+                } 
+                    
+                await Task.Delay(_queueFetchWaitTimeMS);
+
             }
             catch (Exception e)
             {
                 throw;
             }
+            finally
+            {
+                _cancelSource?.Cancel();
+            }
         }
 
-        private void BulkUpdateCategoriesOnIAViews(IList<IaidWithCategories> listOfIAViewUpdatesToProcess)
+        private async Task PeriodicSearchDatabaseUpdateAsync(TimeSpan interval,  CancellationToken cancellationToken)
+        {
+           DateTime _lastOpenSearchUpdateTime = DateTime.Now;
+           int minutesSinceLastNoUpdatesLogMessage = 0;
+           TimeSpan timeSinceLastOpenSearchUpdateCheck = interval;
+
+            try
+            {
+                while (true && !cancellationToken.IsCancellationRequested)
+                {
+                    if (_internalQueue.Count >= _batchSize || ((_internalQueue.Count > 0) && timeSinceLastOpenSearchUpdateCheck >= interval))
+                    {
+                        Task delayTask = Task.Delay(interval, cancellationToken);
+                        await RetrieveAndSubmitUpdatesToOpenSearchDatabase();
+                        
+                        await delayTask;
+
+                    }
+                    else
+                    {
+                        if (timeSinceLastOpenSearchUpdateCheck >= TimeSpan.FromMinutes(5))
+                        {
+                            
+                            int minutesSinceLastUpdate = Convert.ToInt32(Math.Round(timeSinceLastOpenSearchUpdateCheck.TotalMinutes));
+                            if (minutesSinceLastUpdate % 5 == 0 && minutesSinceLastUpdate > minutesSinceLastNoUpdatesLogMessage)
+                            {
+                                minutesSinceLastNoUpdatesLogMessage = minutesSinceLastUpdate;
+                                _logger.LogInformation($"No Taxonomy updates have been received by the Open Search" +
+                                    $" update service in the last {minutesSinceLastUpdate} minutes.  Resetting the update counter.");
+                                _totalInfoAssetsUpdated = 0;
+                            }
+                        }
+                    }
+
+                    timeSinceLastOpenSearchUpdateCheck = DateTime.Now - _lastOpenSearchUpdateTime;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "error updating OpenSearch database Taxonomy records.");
+                _searchDatabaseUpdateErrors++ ;
+
+                if (_searchDatabaseUpdateErrors >= MAX_SEARCH_DB_UPDATE_ERRORS)
+                {
+                    _logger.LogCritical($"Taxonomy search database update has exceeded the configured error threshold of {MAX_SEARCH_DB_UPDATE_ERRORS}. Operation aborted.");
+                    _cancelSource.Cancel();
+                }
+
+            }
+        }
+
+        private async Task RetrieveAndSubmitUpdatesToOpenSearchDatabase()
+        {
+            if (_batchSize == 1 || _internalQueue.Count == 1)
+            {
+                IaidWithCategories nextItem;
+                bool itemRetrived = _internalQueue.TryDequeue(out nextItem);
+                if (itemRetrived)
+                {
+                    await UpdateCategoriesOnIAView(nextItem); 
+                }
+            }
+            else
+            {
+                var items = _internalQueue.DequeueChunk<IaidWithCategories>(_batchSize).ToList();
+                await BulkUpdateCategoriesOnIAViews(items);
+            }
+        }
+
+        private async Task BulkUpdateCategoriesOnIAViews(IList<IaidWithCategories> listOfIAViewUpdatesToProcess)
         {
 
             if(listOfIAViewUpdatesToProcess.Count == 0)
@@ -183,7 +259,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             try
             {
                 _logger.LogInformation($"Submitting bulk update of {listOfIAViewUpdatesToProcess.Count} items to Open Search: ");
-                _targetOpenSearchRepository.SaveAll(listOfIAViewUpdatesToProcess);
+                await _targetOpenSearchRepository.SaveAll(listOfIAViewUpdatesToProcess);
 
                 foreach (var item in listOfIAViewUpdatesToProcess)
                 {
@@ -192,28 +268,34 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
                 int totalForThisBulkUpdateOperation = listOfIAViewUpdatesToProcess.Count;
                 _logger.LogInformation($"Completed bulk update in Open Search for {totalForThisBulkUpdateOperation} items: ");
-                _totalInfoAssetsUPdated += totalForThisBulkUpdateOperation;
-                _logger.LogInformation($" Category data for {_totalInfoAssetsUPdated} assets has now been added or updated in Open Search.");
+                _totalInfoAssetsUpdated += totalForThisBulkUpdateOperation;
+                _logger.LogInformation($" Category data for {_totalInfoAssetsUpdated} assets has now been added or updated in Open Search.");
+                _logger.LogInformation($" There are currently {_internalQueue.Count} results on the internal queue that have been retrieved from Amazon SQS and are awaiting submission to the database.");
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
                 throw;
             }
         }
 
-        private void UpdateCategoriesOnIAView(IaidWithCategories item)
+        private async Task UpdateCategoriesOnIAView(IaidWithCategories item)
         {
             try
             {
                 _logger.LogInformation("Submitting single Asset update to Open Search: " + item.ToString());
-                _targetOpenSearchRepository.Save(item);
+                await _targetOpenSearchRepository.Save(item);
                 _logger.LogInformation($"Completed single Asset in Open Search: {item.ToString()}." );
-                _totalInfoAssetsUPdated++;
+                _totalInfoAssetsUpdated++;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 throw;
             }
+        }
+
+        public void Dispose()
+        {
+            _cancelSource?.Dispose();
         }
     }
 }

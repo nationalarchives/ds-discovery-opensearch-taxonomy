@@ -12,13 +12,6 @@ namespace NationalArchives.Taxonomy.Batch.DailyUpdate.MessageQueue
     internal sealed class CategoriseDocActiveMqConsumer : ActiveMqConsumerBase
     {
         private readonly ICategoriserService<CategorisationResult> _categoriserService;
-        //TODO: Event to notify service when processing from queue complete.
-
-        //public CategoriseDocActiveMqConsumer(ICategoriserService<CategorisationResult> categoriserService, 
-        //    MessageQueueParams inputMsgQueueParams, ILogger<ActiveMqConsumerBase> logger) : base(inputMsgQueueParams.BrokerUri, inputMsgQueueParams.UpdateQueueName, logger)
-        //{
-        //    _categoriserService = categoriserService;
-        //}
 
         public CategoriseDocActiveMqConsumer(ICategoriserService<CategorisationResult> categoriserService,
             MessageQueueParams inputMsgQueueParams, ILogger<ActiveMqConsumerBase> logger) : base(inputMsgQueueParams, inputMsgQueueParams.UpdateQueueName, logger)
@@ -90,7 +83,6 @@ namespace NationalArchives.Taxonomy.Batch.DailyUpdate.MessageQueue
             }
             catch (Exception e)
             {
-                Debug.Print(e.Message);
                 _logger.LogCritical($"Fatal Error: {e.Message}" );
 
                 Exception ie = e.InnerException;
@@ -100,6 +92,7 @@ namespace NationalArchives.Taxonomy.Batch.DailyUpdate.MessageQueue
                     ie = ie.InnerException;
                 } while (ie != null);
 
+                _tcs.SetException(e);
                 throw;
             }
         }
