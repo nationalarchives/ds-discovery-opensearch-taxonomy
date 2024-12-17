@@ -14,14 +14,14 @@ namespace NationalArchives.Taxonomy.Batch
     [TestClass]
     public class UnitTest1
     {
-        ICategoriserService<CategorisationResult> categoriserService = Substitute.For<ICategoriserService<CategorisationResult>>();
-        MessageQueueParams inputMsgQueueParams = Substitute.For<MessageQueueParams>();
-        ILogger<ActiveMqConsumerBase> logger = Substitute.For<ILogger<ActiveMqConsumerBase>>();
-        ILogger<DailyUpdatesManagerService> _logger1 = Substitute.For<ILogger<DailyUpdatesManagerService>>();
+        //ICategoriserService<CategorisationResult> categoriserService = Substitute.For<ICategoriserService<CategorisationResult>>();
+        //ActiveMqMessageQueueParams inputMsgQueueParams = Substitute.For<ActiveMqMessageQueueParams>();
+        //ILogger<ActiveMqConsumerBase> logger = Substitute.For<ILogger<ActiveMqConsumerBase>>();
+        //ILogger<DailyUpdatesManagerService> _logger1 = Substitute.For<ILogger<DailyUpdatesManagerService>>();
 
-        ISourceIaidInputQueueConsumer _iaidConsumer = Substitute.For<ISourceIaidInputQueueConsumer>();
+        //ISourceIaidInputQueueConsumer _iaidConsumer = Substitute.For<ISourceIaidInputQueueConsumer>();
 
-        IUpdateOpenSearchService _updateOpenSearchService = Substitute.For<IUpdateOpenSearchService>();
+        //IUpdateOpenSearchService _updateOpenSearchService = Substitute.For<IUpdateOpenSearchService>();
 
 
         //[TestMethod]

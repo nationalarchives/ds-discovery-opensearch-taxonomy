@@ -15,10 +15,11 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 {
     public class UpdateOpenSearchService : IUpdateOpenSearchService, IDisposable
     {
-        private readonly IUpdateStagingQueueReceiver _interimUpdateQueue;
+        private readonly IUpdateStagingQueueReceiver<IaidWithCategories> _interimUpdateQueue;
         private readonly IOpenSearchIAViewUpdateRepository _targetOpenSearchRepository;
         private readonly ConcurrentQueue<IaidWithCategories> _internalQueue = new ConcurrentQueue<IaidWithCategories>();
         private readonly int _batchSize;
+        private readonly int _queueFetchSleepTimeMS;
         private readonly int _queueFetchWaitTimeMS;
         private readonly int _searchDatabaseUpdateIntervalMS;
         private readonly int _maxInternalQueueSize;
@@ -37,8 +38,8 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
     public bool IsProcessingComplete { get => _isProcessingComplete; set => _isProcessingComplete = value; }
 
-        public UpdateOpenSearchService(IUpdateStagingQueueReceiver updateQueue, IOpenSearchIAViewUpdateRepository targetOpenSearchRepository, ILogger logger, 
-            int batchSize, int queueFetchWaitTimeMS, int searchDatabaseUpdateIntervalMS, int maxInternalQueueSize)
+        public UpdateOpenSearchService(IUpdateStagingQueueReceiver<IaidWithCategories> updateQueue, IOpenSearchIAViewUpdateRepository targetOpenSearchRepository, ILogger logger, 
+            int batchSize, int queueFetchWaitTimeMS, int queueFetchSleepTimeMS, int searchDatabaseUpdateIntervalMS, int maxInternalQueueSize)
         {
             if (updateQueue == null || targetOpenSearchRepository == null)
             {
@@ -48,6 +49,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             _interimUpdateQueue = updateQueue;
             _targetOpenSearchRepository = targetOpenSearchRepository;
             _batchSize = batchSize;
+            _queueFetchSleepTimeMS = queueFetchSleepTimeMS;
             _queueFetchWaitTimeMS = queueFetchWaitTimeMS;
             _searchDatabaseUpdateIntervalMS = searchDatabaseUpdateIntervalMS;
             _maxInternalQueueSize = maxInternalQueueSize;
@@ -108,7 +110,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
                     if (_internalQueue.Count < _maxInternalQueueSize)
                     {
-                       nextBatchOfResults = await _interimUpdateQueue.GetNextBatchOfResults(_logger, sqsRequestTimeoutSeconds: 30); 
+                       nextBatchOfResults = await _interimUpdateQueue.GetNextBatchOfResults(_logger, sqsRequestTimeoutMilliSeconds: _queueFetchWaitTimeMS); 
                     }
                     else
                     {
@@ -129,8 +131,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                         } while (_internalQueue.Count > (_maxInternalQueueSize / 2));
 
                         _logger.LogInformation($"Internal queue size is now {_internalQueue.Count}.  Resuming fetch of taxonomy results from SQS.");
-                        nextBatchOfResults = await _interimUpdateQueue.GetNextBatchOfResults(_logger, sqsRequestTimeoutSeconds: 30);
-
+                        nextBatchOfResults = await _interimUpdateQueue.GetNextBatchOfResults(_logger, sqsRequestTimeoutMilliSeconds: 30);
                     }
 
                     if (nextBatchOfResults != null)
@@ -145,7 +146,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                                     _internalQueue.Enqueue(categorisationResult);
                                 }
                             }
-                            await Task.Delay(_queueFetchWaitTimeMS);
+                            await Task.Delay(_queueFetchSleepTimeMS);
                         }
                         else
                         {
@@ -166,7 +167,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                     }
                 } 
                     
-                await Task.Delay(_queueFetchWaitTimeMS);
+                await Task.Delay(_queueFetchSleepTimeMS);
 
             }
             catch (Exception e)

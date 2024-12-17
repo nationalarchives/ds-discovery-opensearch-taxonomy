@@ -10,14 +10,11 @@ namespace NationalArchives.Taxonomy.Batch
         private List<string> _listOfDocReferences;
         private List<string> _listOfDocReferencesInError;
 
-        public TaxonomyDocumentMessageHolder(string messageId, IEnumerable<string> listOfDocReferences)
+        public TaxonomyDocumentMessageHolder(IEnumerable<string> listOfDocReferences)
         {
-            this.MessageId = messageId;
             this._listOfDocReferences = new List<string>(listOfDocReferences);
             this._listOfDocReferencesInError = new List<String>();
         }
-
-        public string MessageId { get; set; }
 
         public IList<string> ListOfDocReferences
         {

@@ -1,8 +1,12 @@
-﻿namespace NationalArchives.Taxonomy.Common.Domain.Queue
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
-    public class UpdateStagingQueueParams
+    public class FullReindexQueueParams
     {
-        public AmazonSqsParams AmazonSqsParams { get; set;}
+        public AmazonSqsParams AmazonSqsParams { get; set; }
 
         public int WorkerCount { get; set; } = 1;
 

@@ -24,7 +24,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         private bool _addingCompleted;
 
-        private readonly AmazonSqsStagingQueueParams _qParams;
+        private readonly AmazonSqsParams _sqsParams;
         private readonly ILogger<IUpdateStagingQueueSender> _logger;
 
         private const string ROLE_SESSION_NAME = "Taxonomy_SQS_Update";
@@ -33,15 +33,15 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         /// Implementation of IUpdateStagingQueueSender where updates are sent
         /// directly to an ActiveMQ instance.
         /// </summary>
-        /// <param name="qParams"></param>
-        public AmazonSqsDirectUpdateSender(AmazonSqsStagingQueueParams qParams, ILogger<IUpdateStagingQueueSender> logger)
+        /// <param name="updateQueueParams"></param>
+        public AmazonSqsDirectUpdateSender(UpdateStagingQueueParams updateQueueParams, ILogger<IUpdateStagingQueueSender> logger)
         {
-            if(!qParams.PostUpdates)
+            if(!updateQueueParams.PostUpdates)
             {
                 return;
             }
 
-            _qParams = qParams;
+            _sqsParams = updateQueueParams.AmazonSqsParams;
             _logger = logger;   
         }
 
@@ -72,22 +72,22 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 var itemAsList = new List<IaidWithCategories>() { item };
 
                 AmazonSQSClient client;
-                RegionEndpoint region = RegionEndpoint.GetBySystemName(_qParams.Region);
+                RegionEndpoint region = RegionEndpoint.GetBySystemName(_sqsParams.Region);
 
-                if (!_qParams.UseIntegratedSecurity)
+                if (!_sqsParams.UseIntegratedSecurity)
                 {
                     AWSCredentials credentials = null;
 
-                    if (!String.IsNullOrEmpty(_qParams.SessionToken))
+                    if (!String.IsNullOrEmpty(_sqsParams.SessionToken))
                     {
-                        credentials = new SessionAWSCredentials(awsAccessKeyId: _qParams.AccessKey, awsSecretAccessKey: _qParams.SecretKey, _qParams.SessionToken);
+                        credentials = new SessionAWSCredentials(awsAccessKeyId: _sqsParams.AccessKey, awsSecretAccessKey: _sqsParams.SecretKey, _sqsParams.SessionToken);
                     }
                     else
                     {
-                        credentials = new BasicAWSCredentials(accessKey: _qParams.AccessKey, secretKey: _qParams.SecretKey);
+                        credentials = new BasicAWSCredentials(accessKey: _sqsParams.AccessKey, secretKey: _sqsParams.SecretKey);
                     }
 
-                    AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, _qParams.RoleArn, ROLE_SESSION_NAME);
+                    AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, _sqsParams.RoleArn, ROLE_SESSION_NAME);
 
                     client = new AmazonSQSClient(aWSAssumeRoleCredentials, region);
                 }
@@ -99,7 +99,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 var request = new SendMessageRequest()
                 {
                     MessageBody = JsonConvert.SerializeObject(itemAsList),
-                    QueueUrl = _qParams.QueueUrl,
+                    QueueUrl = _sqsParams.QueueUrl,
                 };
 
                 var awaiter = client.SendMessageAsync(request).GetAwaiter();
