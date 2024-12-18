@@ -21,7 +21,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
         private readonly ICategoriserService<CategorisationResult> _categoriserService;
         private readonly ILogger<FullReindexService> _logger;
         private readonly IHostApplicationLifetime _hostApplicationLifetime;
-        private readonly FullReindexIaidProducer _iaidsFromOpenSearchProducer;
+        private readonly FullReindexOpenSearchIaidProducer _iaidsFromOpenSearchProducer;
         private readonly FullReIndexIaidPcQueue<string> _reindexIaidQueue;
         private readonly IUpdateStagingQueueSender _updateStagingQueueSender;
 
@@ -38,7 +38,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
         private bool _stopped;
         private string _StopMessage;
 
-        public FullReindexService(FullReindexIaidProducer iaidProducer, 
+        public FullReindexService(FullReindexOpenSearchIaidProducer iaidProducer, 
             FullReIndexIaidPcQueue<string> reindexIaidQueue, 
             ICategoriserService<CategorisationResult> categoriserService, 
             IUpdateStagingQueueSender updateStagingQueueSender,

@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
 {
-    internal class FullReindexIaidProducer : IIAIDProducer
+    internal class FullReindexOpenSearchIaidProducer : IIAIDProducer
     {
 
         private const int SCROLL_TIMEOUT = 60000; //  1 min.  probably > enough..
@@ -28,7 +28,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
 
         private int _totalCount;
 
-        public FullReindexIaidProducer(FullReIndexIaidPcQueue<string> pcQueue, IInformationAssetViewService iaViewService, OpenSearchAssetBrowseParams openSearchAssetFetchParams,ILogger<FullReindexService> logger)
+        public FullReindexOpenSearchIaidProducer(FullReIndexIaidPcQueue<string> pcQueue, IInformationAssetViewService iaViewService, OpenSearchAssetBrowseParams openSearchAssetFetchParams,ILogger<FullReindexService> logger)
         {
             _pcQueue = pcQueue;
             _iaViewService = iaViewService;

@@ -248,13 +248,13 @@ namespace NationalArchives.Taxonomy.Batch
 
                 var openSearchAssetBrowseParams = config.GetSection("OpenSearchAssetFetchParams").Get<OpenSearchAssetBrowseParams>();
 
-                services.AddSingleton<FullReindexIaidProducer>((ctx) =>
+                services.AddSingleton<FullReindexOpenSearchIaidProducer>((ctx) =>
                 {
                     var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
                     var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
                     var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
 
-                    return new FullReindexIaidProducer(reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
+                    return new FullReindexOpenSearchIaidProducer(reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
                 });
 
                 services.AddSingleton(typeof(ILogger<FullReindexService>), typeof(Logger<FullReindexService>));
