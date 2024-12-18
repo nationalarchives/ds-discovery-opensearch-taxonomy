@@ -8,9 +8,9 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace NationalArchives.Taxonomy.Batch.DailyUpdate.MessageQueue
+namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
-    internal abstract class AmazonSqsConsumerBase : ISourceIaidInputQueueConsumer, ISourceIaidInputQueueConsumerAdapter
+    public abstract class AmazonSqsConsumerBase : ISourceIaidInputQueueConsumer, ISourceIaidInputQueueConsumerAdapter
     {
         protected ActiveMQ.Consumer<string> _msgConsumer;
         protected ILogger _logger;
