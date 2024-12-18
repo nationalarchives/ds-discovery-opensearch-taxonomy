@@ -248,7 +248,7 @@ namespace NationalArchives.Taxonomy.Batch
 
                 var openSearchAssetBrowseParams = config.GetSection("OpenSearchAssetFetchParams").Get<OpenSearchAssetBrowseParams>();
 
-                services.AddSingleton<FullReindexOpenSearchIaidProducer>((ctx) =>
+                services.AddSingleton<IIAIDProducer>((ctx) =>
                 {
                     var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
                     var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
