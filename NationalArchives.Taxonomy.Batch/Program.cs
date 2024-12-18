@@ -238,8 +238,12 @@ namespace NationalArchives.Taxonomy.Batch
 
             if (_operationMode == OperationMode.Full_Reindex)
             {
-                FullReindexQueueParams friqp = config.GetSection("FullReindexQueueParams").Get<FullReindexQueueParams>();
-                services.AddSingleton<FullReindexQueueParams>(friqp);
+                FullReindexQueueParams fullIndexQParams = config.GetSection("FullReindexQueueParams").Get<FullReindexQueueParams>();
+
+                FullReindexIaidProducerSource iaidSource = (FullReindexIaidProducerSource)Enum.Parse(typeof(FullReindexIaidProducerSource), fullIndexQParams.IaidSource);
+                services.AddSingleton<FullReindexQueueParams>(fullIndexQParams);
+
+
                 services.AddSingleton<FullReIndexIaidPcQueue<string>>((ctx) =>
                 {
                     FullReindexQueueParams qparams = ctx.GetRequiredService<FullReindexQueueParams>();
@@ -248,14 +252,29 @@ namespace NationalArchives.Taxonomy.Batch
 
                 var openSearchAssetBrowseParams = config.GetSection("OpenSearchAssetFetchParams").Get<OpenSearchAssetBrowseParams>();
 
-                services.AddSingleton<IIAIDProducer>((ctx) =>
+                if (iaidSource == FullReindexIaidProducerSource.OpenSearch)
                 {
-                    var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
-                    var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
-                    var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
+                    services.AddSingleton<IIAIDProducer>((ctx) =>
+                    {
+                        var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
+                        var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
+                        var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
 
-                    return new FullReindexOpenSearchIaidProducer(reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
-                });
+                        return new FullReindexOpenSearchIaidProducer(reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
+                    }); 
+                }
+                else
+                {
+                    services.AddSingleton<IIAIDProducer>((ctx) =>
+                    {
+                        var qparams = ctx.GetRequiredService<FullReindexQueueParams>();
+                        var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
+                        var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
+                        var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
+
+                        return new FullReindexSqsQueueIaidProducer(qparams,reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
+                    });
+                }
 
                 services.AddSingleton(typeof(ILogger<FullReindexService>), typeof(Logger<FullReindexService>));
                 services.AddHostedService<FullReindexService>();

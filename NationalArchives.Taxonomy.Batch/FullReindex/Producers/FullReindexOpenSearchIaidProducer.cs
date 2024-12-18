@@ -26,7 +26,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
         internal EventHandler<MessageProcessingEventArgs> ProcessingCompleted;
         internal EventHandler<MessageProcessingEventArgs> FatalException;
 
-        private int _totalCount;
+        private volatile int _totalCount;
 
         public FullReindexOpenSearchIaidProducer(FullReIndexIaidPcQueue<string> pcQueue, IInformationAssetViewService iaViewService, OpenSearchAssetBrowseParams openSearchAssetFetchParams,ILogger<FullReindexService> logger)
         {
