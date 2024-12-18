@@ -238,9 +238,11 @@ namespace NationalArchives.Taxonomy.Batch
 
             if (_operationMode == OperationMode.Full_Reindex)
             {
+                FullReindexQueueParams friqp = config.GetSection("FullReindexQueueParams").Get<FullReindexQueueParams>();
+                services.AddSingleton<FullReindexQueueParams>(friqp);
                 services.AddSingleton<FullReIndexIaidPcQueue<string>>((ctx) =>
                 {
-                    var qparams = ctx.GetRequiredService<AmazonSqsParams>();
+                    FullReindexQueueParams qparams = ctx.GetRequiredService<FullReindexQueueParams>();
                     return new FullReIndexIaidPcQueue<string>(qparams.MaxSize);
                 }); // =>  FullReindexService
 

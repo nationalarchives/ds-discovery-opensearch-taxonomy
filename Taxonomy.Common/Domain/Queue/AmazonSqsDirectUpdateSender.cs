@@ -74,27 +74,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 AmazonSQSClient client;
                 RegionEndpoint region = RegionEndpoint.GetBySystemName(_sqsParams.Region);
 
-                if (!_sqsParams.UseIntegratedSecurity)
-                {
-                    AWSCredentials credentials = null;
-
-                    if (!String.IsNullOrEmpty(_sqsParams.SessionToken))
-                    {
-                        credentials = new SessionAWSCredentials(awsAccessKeyId: _sqsParams.AccessKey, awsSecretAccessKey: _sqsParams.SecretKey, _sqsParams.SessionToken);
-                    }
-                    else
-                    {
-                        credentials = new BasicAWSCredentials(accessKey: _sqsParams.AccessKey, secretKey: _sqsParams.SecretKey);
-                    }
-
-                    AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, _sqsParams.RoleArn, ROLE_SESSION_NAME);
-
-                    client = new AmazonSQSClient(aWSAssumeRoleCredentials, region);
-                }
-                else
-                {
-                    client = new AmazonSQSClient(region);
-                }
+                AWSCredentials credentials = _sqsParams.GetCredentials(ROLE_SESSION_NAME);
+                client = new AmazonSQSClient(credentials, region);
 
                 var request = new SendMessageRequest()
                 {

@@ -35,29 +35,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             try
             {
                 RegionEndpoint region = RegionEndpoint.GetBySystemName(sqsParams.Region);
-
-                if (!sqsParams.UseIntegratedSecurity)
-                {  
-                    AWSCredentials credentials = null;
-
-                    if (!String.IsNullOrEmpty(sqsParams.SessionToken))
-                    {
-                        credentials = new SessionAWSCredentials(awsAccessKeyId: sqsParams.AccessKey, awsSecretAccessKey: sqsParams.SecretKey, sqsParams.SessionToken);
-                    }
-                    else
-                    {
-                        credentials = new BasicAWSCredentials(accessKey: sqsParams.AccessKey, secretKey: sqsParams.SecretKey);
-                    }
-
-                    AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, sqsParams.RoleArn, ROLE_SESSION_NAME);
-
-                    _client = new AmazonSQSClient(aWSAssumeRoleCredentials, region);
-                }
-                else
-                {
-                    _client = new AmazonSQSClient(region);
-                }
-
+                AWSCredentials credentials = sqsParams.GetCredentials(ROLE_SESSION_NAME);
+                _client = new AmazonSQSClient(credentials, region);
             }
             catch (Exception e)
             {

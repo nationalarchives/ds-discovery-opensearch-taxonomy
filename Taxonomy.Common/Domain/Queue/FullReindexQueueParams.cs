@@ -17,5 +17,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         public bool EnableVerboseLogging { get; set; }
 
         public bool PostUpdates { get; set; }
+
+        public int MaxSize { get; set; }
     }
 }

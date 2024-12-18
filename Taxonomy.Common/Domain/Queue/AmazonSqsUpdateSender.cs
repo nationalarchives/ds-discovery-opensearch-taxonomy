@@ -1,10 +1,12 @@
 ﻿using Amazon;
 using Amazon.Runtime;
+using Amazon.Runtime.CredentialManagement;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using Apache.NMS;
 using Apache.NMS.ActiveMQ;
 using Microsoft.Extensions.Logging;
+using MongoDB.Libmongocrypt;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using Newtonsoft.Json;
 using System;
@@ -72,7 +74,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
                 throw ;
             }
-            finally { Dispose(); }
+            // finally { Dispose(); }
         }
 
         public async Task<bool> Init(CancellationToken token, Action<int, int> updateQueueProgress)
@@ -208,36 +210,10 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
                 if (currentBatch.Count > 0)
                 {
-
-                    AmazonSQSClient client = null;
-
                     try
                     {
-
                         RegionEndpoint region = RegionEndpoint.GetBySystemName(_sqsParams.Region);
-
-                        if (!_sqsParams.UseIntegratedSecurity)
-                        {
-                            AWSCredentials credentials = null;
-
-                            if (!String.IsNullOrEmpty(_sqsParams.SessionToken))
-                            {
-                                credentials = new SessionAWSCredentials(awsAccessKeyId: _sqsParams.AccessKey, awsSecretAccessKey: _sqsParams.SecretKey, _sqsParams.SessionToken); 
-                            }
-                            else
-                            {
-                                credentials = new BasicAWSCredentials(accessKey: _sqsParams.AccessKey, secretKey: _sqsParams.SecretKey); 
-                            }
-                            
-
-                            AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, _sqsParams.RoleArn, ROLE_SESSION_NAME);
-
-                            client = new AmazonSQSClient(aWSAssumeRoleCredentials, region); 
-                        }
-                        else
-                        {
-                            client = new AmazonSQSClient(region);
-                        }
+                        AWSCredentials credentials = _sqsParams.GetCredentials(ROLE_SESSION_NAME);
 
                         var request = new SendMessageRequest()
                         {
@@ -245,6 +221,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                             QueueUrl = _sqsParams.QueueUrl,
                         };
 
+                        using AmazonSQSClient client = new AmazonSQSClient(credentials, region);
                         SendMessageResponse result =  client.SendMessageAsync(request).Result;
 
                     }
@@ -252,10 +229,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                     {
                         _tcs.SetException(ex);
                         throw;
-                    }
-                    finally
-                    {
-                        client?.Dispose();
                     }
                }
             }
@@ -296,6 +269,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         {
             try
             {
+
                 bool isComplete = _blockingCollection.IsCompleted;
                 return isComplete;
             }
