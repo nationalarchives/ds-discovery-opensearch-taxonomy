@@ -21,7 +21,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
         private readonly ICategoriserService<CategorisationResult> _categoriserService;
         private readonly ILogger<FullReindexService> _logger;
         private readonly IHostApplicationLifetime _hostApplicationLifetime;
-        private readonly IIAIDProducer _iaidsFromOpenSearchProducer;
+        private readonly IIAIDProducer _iaidsProducer;
         private readonly FullReIndexIaidPcQueue<string> _reindexIaidQueue;
         private readonly IUpdateStagingQueueSender _updateStagingQueueSender;
 
@@ -52,7 +52,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
 
             _categoriserStartDelay = catParams.CategoriserStartDelay;
             _logIndividualCategorisationResults = catParams.LogEachCategorisationResult;
-            _iaidsFromOpenSearchProducer = iaidProducer;
+            _iaidsProducer = iaidProducer;
 
             _reindexIaidQueue = reindexIaidQueue;
 
@@ -117,7 +117,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
 
                 Action<int, int> updateQueueProgress = (i, j) => _logger.LogInformation($"{i} assets processed and taxonomy results send to the external update queue.  There are currently {j} taxonomy results in the internal update queue.");
 
-                Task iaidProducerTask = _iaidsFromOpenSearchProducer.InitAsync(stoppingToken);
+                Task iaidProducerTask = _iaidsProducer.InitAsync(stoppingToken);
                 tasks.Add(iaidProducerTask);
                 TaskAwaiter iaidFetchawaiter = iaidProducerTask.GetAwaiter();
                 iaidFetchawaiter.OnCompleted(() =>
@@ -137,7 +137,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
                     }
                     else
                     {
-                        _logger.LogInformation($"Completed fetch of asset identifiers from Open Search. {_iaidsFromOpenSearchProducer.TotalIdentifiersFetched} IAIDs were fetched, current queue size is {_iaidsFromOpenSearchProducer.CurrentQueueSize}");
+                        _logger.LogInformation($"Completed fetch of asset identifiers from Open Search. {_iaidsProducer.TotalIdentifiersFetched} IAIDs were fetched, current queue size is {_iaidsProducer.CurrentQueueSize}");
                     }
 
                 }

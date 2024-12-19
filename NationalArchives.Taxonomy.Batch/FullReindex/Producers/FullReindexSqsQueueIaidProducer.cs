@@ -30,18 +30,40 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
             _openSearchAssetBrowseParams = openSearchAssetFetchParams;
         }
 
-        public int TotalIdentifiersFetched => throw new NotImplementedException();
+        public int TotalIdentifiersFetched => _totalCount;
 
-        public int CurrentQueueSize => throw new NotImplementedException();
-
-        public Task InitAsync(CancellationToken token)
+        public int CurrentQueueSize => _pcQueue.Count;
+        public async Task InitAsync(CancellationToken token)
         {
-            throw new NotImplementedException();
+            try
+            {
+                await Task.Run(() => base.Init(token));
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+                throw;
+            }
         }
 
-        protected override Task HandleTextMessage(IList<string> iaids)
+        protected override async Task HandleTextMessage(IList<string> iaids)
         {
-            throw new NotImplementedException();
+            try
+            {
+                _totalCount += iaids.Count;
+                // Add the first batch of results to the queue.
+                AddToQueue(iaids);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, $"Fatal Error: {ex.Message}");
+                if (!_tcsInit.Task.IsFaulted)
+                {
+                    _tcsInit.SetException(ex); 
+                }
+                throw;
+            }
+;
         }
 
         private void AddToQueue(IList<string> scrollResults)
