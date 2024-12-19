@@ -13,5 +13,7 @@
         public bool EnableVerboseLogging { get; set; }
 
         public bool PostUpdates { get; set; }
+
+        public int SendIntervalMilliseconds { get; set; }
     }
 }

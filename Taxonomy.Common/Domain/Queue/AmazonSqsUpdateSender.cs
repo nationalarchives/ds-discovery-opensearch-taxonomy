@@ -50,6 +50,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         private ThreadLocal<int> _workerMessageCount = new ThreadLocal<int>();
 
         private readonly AmazonSqsParams _sqsParams;
+        private readonly int _sendIntervalMS;
 
         private bool _initialised;
 
@@ -69,6 +70,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
                 _logger = logger;
                 _verboseLoggingEnabled = updateStagingQueueParams.EnableVerboseLogging;
+                _sendIntervalMS = updateStagingQueueParams.SendIntervalMilliseconds;
             }
             catch (Exception e)
             {
@@ -223,6 +225,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
                         using AmazonSQSClient client = new AmazonSQSClient(credentials, region);
                         SendMessageResponse result =  client.SendMessageAsync(request).Result;
+
+                        await Task.Delay(_sendIntervalMS);
 
                     }
                     catch (Exception ex)
