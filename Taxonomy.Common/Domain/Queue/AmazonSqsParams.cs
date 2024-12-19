@@ -18,6 +18,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         public string SessionToken { get; set; }
         public int MaxSize { get; set; }
         public int WaitMilliseconds { get; set; }
+        public string Profile { get; set; }
+        public bool AssumeRole {get;set;}
 
         public AWSCredentials GetCredentials(string roleSessionname)
         {
@@ -34,9 +36,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 {
                     credentials = new BasicAWSCredentials(accessKey: this.AccessKey, secretKey: this.SecretKey);
                 }
-
-                aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, this.RoleArn, roleSessionname);
-
             }
             else
             {
@@ -44,25 +43,26 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 {
                     // Must be running on an AWS EC2 instance for this to work:
                     credentials = new InstanceProfileAWSCredentials();
-                    aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, this.RoleArn, roleSessionname);
                 }
                 else
                 {
                     var chain = new CredentialProfileStoreChain();
 
-                    if (chain.TryGetAWSCredentials("default", out credentials))
-                    {
-                        aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, this.RoleArn, roleSessionname);
-
-                    }
-                    else
-                    {
+                    if (!chain.TryGetAWSCredentials(this.Profile, out credentials))
+                    { 
                         throw new TaxonomyException("Unable to obtain AWS credentials for update queue SQS.");
                     }
                 }
             }
 
-            return aWSAssumeRoleCredentials;
+            if (this.AssumeRole && !String.IsNullOrEmpty(this.RoleArn))
+            {
+                aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, this.RoleArn, roleSessionname);
+                return aWSAssumeRoleCredentials;
+            }
+            else
+            { return credentials; }
+            
         }
     }
 }

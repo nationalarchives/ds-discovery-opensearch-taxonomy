@@ -155,9 +155,9 @@ namespace NationalArchives.Taxonomy.CLI
             if (hasLiveUpdates)
             {
                 //params for update staging queue.
-                //services.AddSingleton<UpdateStagingQueueParams>(config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>());
-                AmazonSqsParams awsSqsParams = config.GetSection("AmazonSqsParams").Get<AmazonSqsParams>();
-                services.AddSingleton<AmazonSqsParams>(awsSqsParams);
+                services.AddSingleton<UpdateStagingQueueParams>(config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>());
+                //AmazonSqsParams awsSqsParams = config.GetSection("AmazonSqsParams").Get<AmazonSqsParams>();
+                //services.AddSingleton<AmazonSqsParams>(awsSqsParams);
 
                 services.AddSingleton(typeof(ILogger<IUpdateStagingQueueSender>), typeof(Logger<AmazonSqsUpdateSender>));
 
