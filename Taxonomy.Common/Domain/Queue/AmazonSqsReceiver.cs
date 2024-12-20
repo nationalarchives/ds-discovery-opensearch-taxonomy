@@ -19,7 +19,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         private readonly AmazonSqsParams _qParams;    
 
-        private AmazonSQSClient _client;
+        private readonly AmazonSQSClient _client;
 
         public AmazonSqsReceiver(AmazonSqsParams sqsParams)
         {

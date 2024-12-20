@@ -49,6 +49,10 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                     }
                 }
             }
+            catch(OperationCanceledException)
+            {
+                _logger.LogError("SQS fetch was cancelled.  Please see other log messages.");
+            }
             catch (Exception ex)
             {
                 if (!_tcsInit.Task.IsFaulted)
