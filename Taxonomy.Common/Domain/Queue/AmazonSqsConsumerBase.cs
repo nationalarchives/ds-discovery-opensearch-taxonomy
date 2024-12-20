@@ -1,7 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
-using NationalArchives.ActiveMQ;
 using NationalArchives.Taxonomy.Batch.DailyUpdate.MesssageQueue;
-using NationalArchives.Taxonomy.Common.Domain.Queue;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -12,7 +10,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
     public abstract class AmazonSqsConsumerBase : ISourceIaidInputQueueConsumer, ISourceIaidInputQueueConsumerAdapter
     {
-        protected ActiveMQ.Consumer<string> _msgConsumer;
         protected ILogger _logger;
         protected List<string> allIaidsReceived = new List<string>();
         protected CancellationToken _token;

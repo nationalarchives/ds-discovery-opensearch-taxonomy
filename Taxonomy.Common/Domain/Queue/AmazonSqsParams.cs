@@ -1,7 +1,5 @@
-﻿using Amazon;
-using Amazon.Runtime;
+﻿using Amazon.Runtime;
 using Amazon.Runtime.CredentialManagement;
-using Amazon.SecurityToken.Model;
 using System;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Queue

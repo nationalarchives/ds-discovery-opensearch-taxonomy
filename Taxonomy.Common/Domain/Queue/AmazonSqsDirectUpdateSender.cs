@@ -14,14 +14,8 @@ using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
-    public class AmazonSqsDirectUpdateSender : IUpdateStagingQueueSender, IDisposable
+    public class AmazonSqsDirectUpdateSender : IUpdateStagingQueueSender
     {
-        private readonly ConnectionFactory m_ConnectionFactory;
-        private readonly IConnection m_Connection;
-        private readonly ISession m_Session;
-        private readonly IDestination m_destination;
-        private readonly IMessageProducer m_Producer;
-
         private bool _addingCompleted;
 
         private readonly AmazonSqsParams _sqsParams;
@@ -31,7 +25,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         /// <summary>
         /// Implementation of IUpdateStagingQueueSender where updates are sent
-        /// directly to an ActiveMQ instance.
+        /// directly to an Amazon SQS instance.
         /// </summary>
         /// <param name="updateQueueParams"></param>
         public AmazonSqsDirectUpdateSender(UpdateStagingQueueParams updateQueueParams, ILogger<IUpdateStagingQueueSender> logger)
@@ -58,6 +52,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         /// <returns>Returns true for compatibility with other possible queue implemenations on the same interface</returns>
         public bool Enqueue(IaidWithCategories item, CancellationToken token)
         {
+
+
             if(token.IsCancellationRequested)
             {
                 return false;
@@ -67,11 +63,12 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
                 throw new TaxonomyException("No item supplied for interim queue update request!");
             }
+
+            AmazonSQSClient client = null;
             try
             {
                 var itemAsList = new List<IaidWithCategories>() { item };
-
-                AmazonSQSClient client;
+                
                 RegionEndpoint region = RegionEndpoint.GetBySystemName(_sqsParams.Region);
 
                 AWSCredentials credentials = _sqsParams.GetCredentials(ROLE_SESSION_NAME);
@@ -92,6 +89,10 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
                 throw;
             }
+            finally
+            {
+                client?.Dispose();
+            }
         }
 
         public bool IsAddingCompleted
@@ -101,17 +102,14 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         public IReadOnlyCollection<string> QueueUpdateErrors => throw new NotImplementedException();
 
-        public void Dispose()
-        {
-            m_Producer?.Dispose();
-            m_Session?.Dispose();
-            m_Connection?.Dispose();
-        }
-
-
         public void CompleteAdding()
         {
             _addingCompleted = true;
+        }
+
+        void IDisposable.Dispose()
+        {
+            
         }
     }
 }

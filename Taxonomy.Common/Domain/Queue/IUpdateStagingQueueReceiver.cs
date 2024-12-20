@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using NationalArchives.Taxonomy.Common.BusinessObjects;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 

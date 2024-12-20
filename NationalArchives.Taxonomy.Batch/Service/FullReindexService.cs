@@ -231,7 +231,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
                             {
                                 foreach (Exception inner in fullRindexTask.Exception.InnerExceptions)
                                 {
-                                    _logger.LogError($"Message: { fullRindexTask.Exception.Message}, stack trace: { resultsQueueUpdateTask.Exception.StackTrace}");
+                                    _logger.LogError(inner, $"Message: { fullRindexTask.Exception.Message}");
                                 }
                                 _StopMessage = "Fatal exception occured during processing the full reindex operation.  Please check the logs for details.";
                                 _logger.LogCritical(_StopMessage);

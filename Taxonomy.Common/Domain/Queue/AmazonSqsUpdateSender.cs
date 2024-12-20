@@ -1,12 +1,8 @@
 ﻿using Amazon;
 using Amazon.Runtime;
-using Amazon.Runtime.CredentialManagement;
 using Amazon.SQS;
 using Amazon.SQS.Model;
-using Apache.NMS;
-using Apache.NMS.ActiveMQ;
 using Microsoft.Extensions.Logging;
-using MongoDB.Libmongocrypt;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using Newtonsoft.Json;
 using System;
@@ -21,12 +17,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
     public class AmazonSqsUpdateSender : IUpdateStagingQueueSender, IDisposable
     {
         private const string ROLE_SESSION_NAME = "Taxonomy_SQS_Update_FULL_REINDEX";
-
-        private readonly ConnectionFactory _activeMqConnectionFactory;
-        private readonly IConnection _activeMqConnection;
-        private readonly ISession _activeMqSession;
-        private readonly IDestination _activeMqdestination;
-        private readonly IMessageProducer _activeMqProducer;
 
         private BlockingCollection<IaidWithCategories> _blockingCollection = new BlockingCollection<IaidWithCategories>();
         private CancellationToken _token = default;
@@ -190,7 +180,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 {
                     if (!_tcs.Task.IsFaulted) //Only one worker should set this as calling repeatedly causes an exception
                     {
-                        _tcs.TrySetException(new TaxonomyException(TaxonomyErrorType.JMS_EXCEPTION, "The Active MQ update error count has been exceeded.")); 
+                        _tcs.TrySetException(new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, "The SQS update error count has been exceeded.")); 
                     }
                     CompleteAdding();
                     break;
@@ -226,7 +216,10 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                         using AmazonSQSClient client = new AmazonSQSClient(credentials, region);
                         SendMessageResponse result =  client.SendMessageAsync(request).Result;
 
-                        await Task.Delay(_sendIntervalMS);
+                        if (_sendIntervalMS > 0)
+                        {
+                            await Task.Delay(_sendIntervalMS); 
+                        }
 
                     }
                     catch (Exception ex)
@@ -262,11 +255,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
             }
 
-            _blockingCollection.Dispose();
-            _activeMqProducer?.Dispose();
-            _activeMqSession?.Dispose();
-            _activeMqConnection?.Dispose();
-
+            _blockingCollection?.Dispose();
         }
 
         private bool IsComplete()

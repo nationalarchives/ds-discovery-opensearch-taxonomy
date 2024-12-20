@@ -3,7 +3,6 @@ using Amazon.Runtime;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Logging;
-using NationalArchives.Taxonomy.Common.BusinessObjects;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
