@@ -1,12 +1,13 @@
-﻿using Nest;
+﻿//using Nest;
+using OpenSearch.Client;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace NationalArchives.Taxonomy.Common.DataObjects.Elastic
+namespace NationalArchives.Taxonomy.Common.DataObjects.OpenSearch
 {
-    [ElasticsearchType(Name = "recordassetview")]
-    public class ElasticRecordAssetView
+    //[OpenSearchType(Name = "recordassetview")]
+    public class OpenSearchRecordAssetView
     {
         public string ID { get; set; } = string.Empty;
         public double? Score { get; set; }

@@ -1,8 +1,12 @@
-﻿using Apache.NMS;
+﻿using Amazon;
+using Amazon.Runtime;
+using Amazon.SQS;
+using Amazon.SQS.Model;
+using Apache.NMS;
 using Apache.NMS.ActiveMQ;
 using Microsoft.Extensions.Logging;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.Helpers;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -12,15 +16,15 @@ using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
-    public class ActiveMqUpdateSender : IUpdateStagingQueueSender, IDisposable
+    public class AmazonSqsUpdateSender : IUpdateStagingQueueSender, IDisposable
     {
+        private const string ROLE_SESSION_NAME = "Taxonomy_SQS_Update_FULL_REINDEX";
 
         private readonly ConnectionFactory _activeMqConnectionFactory;
         private readonly IConnection _activeMqConnection;
         private readonly ISession _activeMqSession;
         private readonly IDestination _activeMqdestination;
         private readonly IMessageProducer _activeMqProducer;
-
 
         private BlockingCollection<IaidWithCategories> _blockingCollection = new BlockingCollection<IaidWithCategories>();
         private CancellationToken _token = default;
@@ -37,37 +41,26 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         Action<int, int> _updateQueueProgress;
 
-        private ILogger<IUpdateStagingQueueSender> _logger;
+        private readonly ILogger<IUpdateStagingQueueSender> _logger;
         private bool _verboseLoggingEnabled;
 
         private ThreadLocal<int> _workerResultCount = new ThreadLocal<int>();
         private ThreadLocal<int> _workerMessageCount = new ThreadLocal<int>();
 
+        private readonly AmazonSqsStagingQueueParams _qParams;
+
         private bool _initialised;
 
-        public ActiveMqUpdateSender(UpdateStagingQueueParams qParams, ILogger<IUpdateStagingQueueSender> logger)
+        public AmazonSqsUpdateSender(AmazonSqsStagingQueueParams qParams, ILogger<IUpdateStagingQueueSender> logger)
         {
-            if (qParams == null || String.IsNullOrEmpty(qParams.QueueName) || String.IsNullOrEmpty(qParams.Uri))
-            {
-                throw new TaxonomyException(TaxonomyErrorType.JMS_EXCEPTION, "Invalid or missing queue parameters for Active MQ");
-            }
-
             try
             {
-                _activeMqConnectionFactory = new ConnectionFactory(qParams.Uri);
-                if (!String.IsNullOrWhiteSpace(qParams.UserName) && !String.IsNullOrWhiteSpace(qParams.Password))
+                if (qParams == null || String.IsNullOrEmpty(qParams.QueueUrl))
                 {
-                    _activeMqConnection = _activeMqConnectionFactory.CreateConnection(qParams.UserName, qParams.Password);
+                    throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, "Invalid or missing queue parameters for Amazon SQS");
                 }
-                else
-                {
-                    _activeMqConnection = _activeMqConnectionFactory.CreateConnection();
-                }
-                _activeMqConnection.Start();
-                _activeMqSession = _activeMqConnection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                _activeMqdestination = _activeMqSession.GetQueue(qParams.QueueName);
-                _activeMqProducer = _activeMqSession.CreateProducer(_activeMqdestination);
 
+                _qParams = qParams;
                 _workerCount = Math.Max(qParams.WorkerCount, 1);
                 _maxSendErrors = qParams.MaxErrors;
                 _batchSize = Math.Max(qParams.BatchSize, 1);
@@ -78,22 +71,22 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             catch (Exception e)
             {
                 Dispose();
-                throw new TaxonomyException(TaxonomyErrorType.JMS_EXCEPTION, $"Error establishing a connection to ActiveMQ {qParams.QueueName}, at {qParams.Uri}", e);
+                throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, $"Error establishing a connection to Amazon SQS {qParams.QueueUrl}", e);
             }
         }
 
-        public Task<bool> Init(CancellationToken token, Action<int, int> updateQueueProgress)
+        public async Task<bool> Init(CancellationToken token, Action<int, int> updateQueueProgress)
         {
             if(_initialised)
             {
-                return null;
+                return false;
             }
 
             _token = token;
             _updateQueueProgress = updateQueueProgress;
             _tcs = new TaskCompletionSource<bool>();
 
-            Timer notifcationTimer = new Timer(PrintUpdate, null, 60000, 60000) ;
+            Timer notificationTimer = new Timer(PrintUpdate, null, 60000, 60000) ;
 
             var tasks = new List<Task>();
 
@@ -105,20 +98,31 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                     tasks.Add(task);
                 }
 
+                var firstToComplete = await Task.WhenAny(tasks);
+                await firstToComplete;
+                if (_tcs.Task.IsFaulted) 
+                {
+                    throw _tcs.Task.Exception;
+                }
+
                 Task.WaitAll(tasks.ToArray());
                 _tcs.SetResult(_sendErrors.Count == 0 ? true : false);
             }
             catch (Exception ex)
             {
-                _tcs.TrySetException(ex);
+                if (!_tcs.Task.IsFaulted)
+                {
+                    _tcs.SetException(ex); 
+                }
+                return await _tcs.Task;
             }
             finally
             {
-                notifcationTimer.Dispose();
+                notificationTimer?.Dispose();
             }
 
             _initialised = true;
-            return _tcs.Task;
+            return await _tcs.Task;
         }
 
         private  void PrintUpdate(object data)
@@ -173,13 +177,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
 
 
-        private void Consume1()
+        private async Task Consume1()
         {
-
 
             while (!IsComplete() && !_token.IsCancellationRequested)
             {
-
                 if (_sendErrors.Count >= _maxSendErrors)
                 {
                     if (!_tcs.Task.IsFaulted) //Only one worker should set this as calling repeatedly causes an exception
@@ -192,7 +194,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
                 var currentBatch = new List<IaidWithCategories>(_batchSize);
 
-
                 for (int i = 0; i < _batchSize && (!IsComplete() && !_token.IsCancellationRequested); i++)
                 {
                     IaidWithCategories nextResult;
@@ -203,29 +204,62 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                     {
                         currentBatch.Add(nextResult);
                     }
-
                 }
 
                 if (currentBatch.Count > 0)
                 {
-                    byte[] serialisedResults = currentBatch.ToByteArray();
                     try
                     {
-                        var bytesMessage = _activeMqProducer.CreateBytesMessage(serialisedResults);
-                        _activeMqProducer.Send(bytesMessage);
-                        _workerMessageCount.Value++;
-                        _workerResultCount.Value += currentBatch.Count;
-                        _resultsSent += currentBatch.Count;
-                        if (_verboseLoggingEnabled)
+                        AmazonSQSClient client;
+                        RegionEndpoint region = RegionEndpoint.GetBySystemName(_qParams.Region);
+
+                        if (!_qParams.UseIntegratedSecurity)
                         {
-                            _logger.LogInformation($"Forwarded a message with {currentBatch.Count} categoriation results to the external ActiveMQ update queue.  This worker [thread ID {Thread.CurrentThread.ManagedThreadId}] has now forwarded {_workerMessageCount.Value} messages containing {_workerResultCount.Value} results."); 
+                            AWSCredentials credentials = null;
+
+                            if (!String.IsNullOrEmpty(_qParams.SessionToken))
+                            {
+                                credentials = new SessionAWSCredentials(awsAccessKeyId: _qParams.AccessKey, awsSecretAccessKey: _qParams.SecretKey, _qParams.SessionToken); 
+                            }
+                            else
+                            {
+                                credentials = new BasicAWSCredentials(accessKey: _qParams.AccessKey, secretKey: _qParams.SecretKey); 
+                            }
+                            
+
+                            AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, _qParams.RoleArn, ROLE_SESSION_NAME);
+
+                            client = new AmazonSQSClient(aWSAssumeRoleCredentials, region); 
                         }
+                        else
+                        {
+                            client = new AmazonSQSClient(region);
+                        }
+
+                        var request = new SendMessageRequest()
+                        {
+                            MessageBody = JsonConvert.SerializeObject(currentBatch),
+                            QueueUrl = _qParams.QueueUrl,
+                        };
+
+                        //try
+                        //{
+
+                        SendMessageResponse result =  client.SendMessageAsync(request).Result;
+                        //}
+                        //catch (Exception)
+                        //{
+
+                        //    throw;
+                        //}
+                        //Console.WriteLine(result);
                     }
                     catch (Exception ex)
                     {
-                        _sendErrors.Add($"Error updating the queue for {String.Join(";", currentBatch)}. Details: {ex.Message}");
-                    } 
-                }
+                        _tcs.SetException(ex);
+                        throw;
+                    }
+               }
             }
 
             if(_token.IsCancellationRequested)

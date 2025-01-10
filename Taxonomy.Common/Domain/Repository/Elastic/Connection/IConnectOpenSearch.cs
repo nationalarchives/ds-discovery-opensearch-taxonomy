@@ -1,31 +1,32 @@
 ﻿using NationalArchives.Taxonomy.Common.BusinessObjects;
-using Nest;
+using OpenSearch.Client;
+//using Nest;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
-    public interface IConnectElastic<T> where T : class
+    public interface IConnectOpenSearch<T> where T : class
     {
-        ISearchResponse<T> Search(ElasticSearchParameters searchCommand);
+        ISearchResponse<T> Search(OpenSearchParameters searchCommand);
 
-        Task<ISearchResponse<T>> SearchAsync(ElasticSearchParameters searchCommand);
+        Task<ISearchResponse<T>> SearchAsync(OpenSearchParameters searchCommand);
 
         IGetResponse<T> Get(string id);
 
         Task<IGetResponse<T>> GetAsync(string id);
 
-        Task<IMultiGetResponse> MultiGetAsync(string[] ids);
+        Task<MultiGetResponse> MultiGetAsync(string[] ids);
 
-        IIndexResponse IndexDocument(T documentToIndex, bool useInmemoryIndex);
+        IndexResponse IndexDocument(T documentToIndex, bool useInmemoryIndex);
 
         IList<CategorisationResult> CategoryMultiSearch(QueryBase baseOrIdsQuery, IList<Category> sourceCategories, bool useInMemoryIndex, bool includeScores, int maxConcurrentQueries);
 
-        long Count(ElasticSearchParameters countCommand);
+        long Count(OpenSearchParameters countCommand);
 
         Task<ISearchResponse<T>> ScrollAsync(int scrollTimeout, string scrollId);
 
-        Task<IClearScrollResponse> ClearScroll(string scrollId);
+        Task<ClearScrollResponse> ClearScroll(string scrollId);
 
         void DeleteDocumentFromIndex(string documentId, bool useInMemoryIndex);
     }

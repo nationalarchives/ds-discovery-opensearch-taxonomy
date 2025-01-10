@@ -2,9 +2,9 @@ using AutoMapper;
 using Lucene.Net.Analysis;
 using Microsoft.OpenApi.Models;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
+using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
-using NationalArchives.Taxonomy.Common.Domain.Repository.Elastic;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Lucene;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Mongo;
 using NationalArchives.Taxonomy.Common.Service;
@@ -12,41 +12,43 @@ using NationalArchives.Taxonomy.Common.Service;
 var builder = WebApplication.CreateBuilder(args);
 
 var config = builder.Configuration;
+config.AddEnvironmentVariables("TAXONOMY_");
+config.AddUserSecrets<Program>();
 
 // Add services to the container.
 builder.Services.AddAutoMapper(mc => mc.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }));
 
-builder.Services.AddSingleton(config.GetSection("DiscoveryElasticParams").Get<DiscoverySearchElasticConnectionParameters>());
-builder.Services.AddSingleton(config.GetSection("CategoryElasticParams").Get<CategoryDataElasticConnectionParameters>());
+builder.Services.AddSingleton(config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>());
+builder.Services.AddSingleton(config.GetSection("CategoryOpenSearchParams").Get<CategoryDataOpenSearchConnectionParameters>());
 builder.Services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
 
-builder.Services.AddScoped<IConnectElastic<ElasticRecordAssetView>>((ctx) =>
+builder.Services.AddScoped<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) =>
 {
-    ElasticConnectionParameters cparams = ctx.GetRequiredService<DiscoverySearchElasticConnectionParameters>();
-    IConnectElastic<ElasticRecordAssetView> recordAssetsElasticConnection = new ElasticConnection<ElasticRecordAssetView>(cparams);
+    OpenSearchConnectionParameters cparams = ctx.GetRequiredService<DiscoveryOpenSearchConnectionParameters>();
+    IConnectOpenSearch<OpenSearchRecordAssetView> recordAssetsElasticConnection = new OpenSearchConnection<OpenSearchRecordAssetView>(cparams);
     return recordAssetsElasticConnection;
 });
 
-CategorySource categorySource = (CategorySource)Enum.Parse(typeof(CategorySource), config.GetValue<string>("CategorySource"));
+ CategorySource categorySource = (CategorySource)Enum.Parse(typeof(CategorySource), config.GetValue<string>("CategorySource"));
 // Get the categories form either Mongo or Elastic
 switch (categorySource)
 {
-    case CategorySource.Elastic:
+    case CategorySource.OpenSearch:
 
         // Categories connection info
-        builder.Services.AddTransient<IConnectElastic<CategoryFromElastic>>((ctx) =>
+        builder.Services.AddTransient<IConnectOpenSearch<CategoryFromOpenSearch>>((ctx) =>
         {
-            CategoryDataElasticConnectionParameters categoryDataElasticConnParams = config.GetSection("CategoryElasticParams").Get<CategoryDataElasticConnectionParameters>();
-            IConnectElastic<CategoryFromElastic> categoriesElasticConnection = new ElasticConnection<CategoryFromElastic>(categoryDataElasticConnParams);
+            CategoryDataOpenSearchConnectionParameters categoryDataElasticConnParams = config.GetSection("CategoryOpenSearchParams").Get<CategoryDataOpenSearchConnectionParameters>();
+            IConnectOpenSearch<CategoryFromOpenSearch> categoriesElasticConnection = new OpenSearchConnection<CategoryFromOpenSearch>(categoryDataElasticConnParams);
             return categoriesElasticConnection;
         });
 
         // category list repo using category connection info.
-        builder.Services.AddTransient<ICategoryRepository, ElasticCategoryRepository>((ctx) =>
+        builder.Services.AddTransient<ICategoryRepository, OpenSearchCategoryRepository>((ctx) =>
         {
             IMapper mapper = ctx.GetRequiredService<IMapper>();
-            IConnectElastic<CategoryFromElastic> elasticConnectionInfo = ctx.GetRequiredService<IConnectElastic<CategoryFromElastic>>();
-            ElasticCategoryRepository categoryRepo = new ElasticCategoryRepository(elasticConnectionInfo, mapper);
+            IConnectOpenSearch<CategoryFromOpenSearch> elasticConnectionInfo = ctx.GetRequiredService<IConnectOpenSearch<CategoryFromOpenSearch>>();
+            OpenSearchCategoryRepository categoryRepo = new OpenSearchCategoryRepository(elasticConnectionInfo, mapper);
             return categoryRepo;
         });
 
@@ -74,9 +76,9 @@ CategoriserLuceneParams categoriserLuceneParams = config.GetSection("Categoriser
 builder.Services.AddTransient<IIAViewRepository>((ctx) =>
 {
     IMapper mapper = ctx.GetRequiredService<IMapper>();
-    IConnectElastic<ElasticRecordAssetView> elasticConnectionInfo = ctx.GetRequiredService<IConnectElastic<ElasticRecordAssetView>>();
+    IConnectOpenSearch<OpenSearchRecordAssetView> elasticConnectionInfo = ctx.GetRequiredService<IConnectOpenSearch<OpenSearchRecordAssetView>>();
     LuceneHelperTools luceneHelperTools = ctx.GetRequiredService<LuceneHelperTools>();
-    ElasticIAViewRepository iaRepo = new ElasticIAViewRepository(elasticConnectionInfo, luceneHelperTools, mapper);
+    OpenSearchIAViewRepository iaRepo = new OpenSearchIAViewRepository(elasticConnectionInfo, luceneHelperTools, mapper);
     return iaRepo;
 });
 

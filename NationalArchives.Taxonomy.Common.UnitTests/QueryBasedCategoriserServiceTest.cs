@@ -2,7 +2,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.Domain;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
-using NationalArchives.Taxonomy.Common.Domain.Repository.Elastic;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using NationalArchives.Taxonomy.Common.Service;
 using NSubstitute;
 using System.Collections.Generic;

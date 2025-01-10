@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
-    public abstract class ElasticConnectionParameters : IElasticConnectionParameters
+    public abstract class OpenSearchConnectionParameters : IOpenSearchConnectionParameters
     {
         public string Scheme { get; set; }
         public string Host { get; set; }
@@ -28,31 +28,31 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
 
         public int RequestTimeout { get; set; }
 
-        public ElasticAwsParams ElasticAwsParams { get; set; }
+        public OpenSearchAwsParams OpenSearchAwsParams { get; set; }
 
     }
 
-    public sealed class DiscoverySearchElasticConnectionParameters : ElasticConnectionParameters
+    public sealed class DiscoveryOpenSearchConnectionParameters : OpenSearchConnectionParameters
     {
        
     }
 
-    public sealed class CategoryDataElasticConnectionParameters : ElasticConnectionParameters
+    public sealed class CategoryDataOpenSearchConnectionParameters : OpenSearchConnectionParameters
     {
 
     }
 
-    public sealed class CategoriserElasticConnectionParameters : ElasticConnectionParameters
+    public sealed class CategoriserOpenSearchConnectionParameters : OpenSearchConnectionParameters
     {
 
     }
 
-    public sealed class UpdateElasticConnectionParameters : ElasticConnectionParameters
+    public sealed class UpdateOpenSearchConnectionParameters : OpenSearchConnectionParameters
     {
 
     }
 
-    public sealed class ElasticAwsParams 
+    public sealed class OpenSearchAwsParams 
     {
         public bool UseAwsConnection { get; set; }
         public string AccessKey { get; set; }

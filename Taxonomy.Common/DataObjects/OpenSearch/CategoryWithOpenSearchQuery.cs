@@ -1,13 +1,13 @@
 ﻿using NationalArchives.Taxonomy.Common.BusinessObjects;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
-    public class CategoryWithElasticQuery : Category
+    public class CategoryWithOpenSearchQuery : Category
     {
         private Query _parsedQuery;
 
         //TODO Replace Query with appropriate Elastic Search class...
-        public CategoryWithElasticQuery(Category category, Query parsedQuery) : base()
+        public CategoryWithOpenSearchQuery(Category category, Query parsedQuery) : base()
         {
             this._parsedQuery = parsedQuery;
         }

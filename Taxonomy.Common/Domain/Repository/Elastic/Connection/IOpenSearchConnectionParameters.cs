@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
-    public interface IElasticConnectionParameters
+    public interface IOpenSearchConnectionParameters
     {
         string Host { get; set; }
         string IndexDatabase { get; set; }

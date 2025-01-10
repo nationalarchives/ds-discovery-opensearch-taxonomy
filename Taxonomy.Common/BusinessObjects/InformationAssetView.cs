@@ -1,4 +1,4 @@
-﻿using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
+﻿using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 
 namespace NationalArchives.Taxonomy.Common.Domain
 {

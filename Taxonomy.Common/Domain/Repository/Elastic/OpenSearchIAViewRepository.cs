@@ -1,23 +1,25 @@
 ﻿using AutoMapper;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
+using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Lucene;
 using NationalArchives.Taxonomy.Common.Helpers;
-using Nest;
+using OpenSearch.Client;
+
+//using Nest;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
+namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 {
-    public class ElasticIAViewRepository : AbstractElasticRespository<ElasticRecordAssetView>, IIAViewRepository
+    public class OpenSearchIAViewRepository : AbstractOpenSearchRespository<OpenSearchRecordAssetView>, IIAViewRepository
     {
         private LuceneHelperTools _luceneHelperTools;
 
-        public ElasticIAViewRepository(IConnectElastic<ElasticRecordAssetView> elasticConnection, LuceneHelperTools luceneHelperTools, IMapper mapper) : base(elasticConnection, mapper)
+        public OpenSearchIAViewRepository(IConnectOpenSearch<OpenSearchRecordAssetView> openSearchConnection, LuceneHelperTools luceneHelperTools, IMapper mapper) : base(openSearchConnection, mapper)
         {
             _luceneHelperTools = luceneHelperTools;
         }
@@ -31,13 +33,13 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
                 // So passing ElasticSearchResultAssetView will bring back a 404 even though though its a base type
                 //IGetResponse<RecordAssetView> searchResponse =  await elasticClient.GetAsync<RecordAssetView>(docReference);
                 
-                IGetResponse<ElasticRecordAssetView> response = await _elasticConnection.GetAsync(docReference);
+                IGetResponse<OpenSearchRecordAssetView> response = await _openSearchConnection.GetAsync(docReference);
                 if(!response.IsValid)
                 {
-                    throw new TaxonomyException(TaxonomyErrorType.ELASTIC_INVALID_RESPONSE, $"Error retrieving document id {docReference} from Elasic Search", response.OriginalException);
+                    throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_INVALID_RESPONSE, $"Error retrieving document id {docReference} from Open Search", response.OriginalException);
                 }
 
-                ElasticRecordAssetView searchResult = response.Source;
+                OpenSearchRecordAssetView searchResult = response.Source;
 
                 //Alternative using ISearchResponse instead of IGetResponse.  NOt sure which is preferred
                 // - Get is detailed at https://www.elastic.co/guide/en/elasticsearch/client/net-api/1.x/get.html
@@ -64,18 +66,18 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
 
             try
             {
-                IMultiGetResponse response = await _elasticConnection.MultiGetAsync(docReferences);
+                MultiGetResponse response = await _openSearchConnection.MultiGetAsync(docReferences);
 
                 if (!response.IsValid)
                 {
-                    throw new TaxonomyException(TaxonomyErrorType.ELASTIC_INVALID_RESPONSE, $"Error retrieving mutiple document request from Elasic Search.  The IAIDs submitted were: {String.Join(";", docReferences)}", response.OriginalException);
+                    throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_INVALID_RESPONSE, $"Error retrieving mutiple document request from Elasic Search.  The IAIDs submitted were: {String.Join(";", docReferences)}", response.OriginalException);
                 }
 
-                var results = response.GetMany<ElasticRecordAssetView>(docReferences);
+                var results = response.GetMany<OpenSearchRecordAssetView>(docReferences);
 
                 foreach (var result in results)
                 {
-                    ElasticRecordAssetView searchResult = result.Source;
+                    OpenSearchRecordAssetView searchResult = result.Source;
                     var infoAsset = _mapper.Map<InformationAssetView>(searchResult);
                     informationAssets.Add(infoAsset);
                 }
@@ -104,8 +106,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
             try
             {
 
-                ElasticRecordAssetView esAsset = _mapper.Map<InformationAssetView, ElasticRecordAssetView>(iaView);
-                IIndexResponse response = _elasticConnection.IndexDocument(esAsset, useInmemoryIndex: true);
+                OpenSearchRecordAssetView esAsset = _mapper.Map<InformationAssetView, OpenSearchRecordAssetView>(iaView);
+                IndexResponse response = _openSearchConnection.IndexDocument(esAsset, useInmemoryIndex: true);
 
                 //Race condition in ES?
                 //System.Threading.Thread.Sleep(1000);
@@ -128,10 +130,10 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
 
                 //return matchedCategoriesInMemory;
                 // TODO: Async ?
-                IList<CategorisationResult> matchedCategories = _elasticConnection.CategoryMultiSearch(base_term_query, sourceCategories, true, includeScores, 50);
+                IList<CategorisationResult> matchedCategories = _openSearchConnection.CategoryMultiSearch(base_term_query, sourceCategories, true, includeScores, 50);
 
                 //TODO: Possibly mange within the connection itself.
-                _elasticConnection.DeleteDocumentFromIndex(iaView.DocReference, true);
+                _openSearchConnection.DeleteDocumentFromIndex(iaView.DocReference, true);
 
                 return matchedCategories;
 
@@ -147,8 +149,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
         {
             try
             {
-                var elasticSearchParamsBuilder = new ElasticSearchParamsBuilder();
-                ElasticSearchParameters searchParams = elasticSearchParamsBuilder.GetElasticSearchParameters(query: query, heldByCode: heldByCode, pageSize: limit, pagingOffset: offset);
+                var openSearchParamsBuilder = new OpenSearchParamsBuilder();
+                OpenSearchParameters searchParams = openSearchParamsBuilder.GetOpenSearchParameters(query: query, heldByCode: heldByCode, pageSize: limit, pagingOffset: offset);
 
                 var fieldList = new List<string>();
 
@@ -164,11 +166,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
                 
                 searchParams.SearchFields = fieldList;
 
-                ISearchResponse<ElasticRecordAssetView> searchResponse = await _elasticConnection.SearchAsync(searchParams);
+                ISearchResponse<OpenSearchRecordAssetView> searchResponse = await _openSearchConnection.SearchAsync(searchParams);
 
                 Debug.Print(searchResponse.GetType().Name);
 
-                var paginatedListFactory = new IAListFactory<ElasticRecordAssetView, InformationAssetViewWithScore>(searchResponse, _mapper);
+                var paginatedListFactory = new IAListFactory<OpenSearchRecordAssetView, InformationAssetViewWithScore>(searchResponse, _mapper);
                 var paginatedList = paginatedListFactory.CreatePaginatedList(limit: limit, offset: offset, minScore: minScore);
 
                 return paginatedList;
@@ -180,36 +182,36 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
             }
         }
 
-        public InformationAssetScrollList BrowseAllDocReferences(ElasticAssetBrowseParams browseParams,  string scrollId = null)
+        public InformationAssetScrollList BrowseAllDocReferences(OpenSearchAssetBrowseParams browseParams,  string scrollId = null)
         {
 
             try
             {
                 if (String.IsNullOrWhiteSpace(scrollId))
                 {
-                    var elasticParamsBuilder = new ElasticSearchParamsBuilder();
-                    ElasticSearchParameters searchParams = elasticParamsBuilder.GetElasticSearchParametersForScroll(browseParams);
+                    var openSearchParamsBuilder = new OpenSearchParamsBuilder();
+                    OpenSearchParameters searchParams = openSearchParamsBuilder.GetSearchParametersForScroll(browseParams);
 
                     // Get the first set of results which includes the sccroll ID to use in future requests.
-                    Task<ISearchResponse<ElasticRecordAssetView>> assetFetch = _elasticConnection.SearchAsync(searchParams);
+                    Task<ISearchResponse<OpenSearchRecordAssetView>> assetFetch = _openSearchConnection.SearchAsync(searchParams);
                     var awaiter = assetFetch.GetAwaiter();
                     var searchResponse = awaiter.GetResult();
 
                     if(assetFetch.IsFaulted)
                     {
-                        throw new TaxonomyException(TaxonomyErrorType.ELASTIC_SCROLL_EXCEPTION, "Unable to fetch list of asset IDs on initial scroll request.", assetFetch.Exception.Flatten());
+                        throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_SCROLL_EXCEPTION, "Unable to fetch list of asset IDs on initial scroll request.", assetFetch.Exception.Flatten());
                     }
 
                     if (String.IsNullOrEmpty(searchResponse.ScrollId))
                     {
-                        throw new TaxonomyException(TaxonomyErrorType.ELASTIC_SCROLL_EXCEPTION, "Unable to retrieve scroll ID for paging information assets.");
+                        throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_SCROLL_EXCEPTION, "Unable to retrieve scroll ID for paging information assets.");
                     }
 
                     return  new InformationAssetScrollList(searchResponse.ScrollId, searchResponse.Hits.Select(h => h.Id).ToList());
                 }
                 else  // existing scroll request
                 {
-                    var scrollResponse = _elasticConnection.ScrollAsync(browseParams.PageSize, scrollId);
+                    var scrollResponse = _openSearchConnection.ScrollAsync(browseParams.PageSize, scrollId);
                     if (scrollResponse.Result.Hits.Any())
                     {
                         return new InformationAssetScrollList (scrollId, scrollResponse.Result.Hits.Select(h => h.Id).ToList());
@@ -217,7 +219,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Elastic
                     else
                     {
                         //TODO: Async?
-                        var response = _elasticConnection.ClearScroll(scrollId).Result;
+                        var response = _openSearchConnection.ClearScroll(scrollId).Result;
                         if(!response.IsValid)
                         {
                             //throw new TaxonomyException(TaxonomyErrorType.ELASTIC_SCROLL_EXCEPTION, "Error clearing Information Asset Scroll", response.OriginalException);

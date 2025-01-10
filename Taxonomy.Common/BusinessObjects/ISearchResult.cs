@@ -1,4 +1,4 @@
-﻿namespace NationalArchives.Taxonomy.Common.DataObjects.Elastic
+﻿namespace NationalArchives.Taxonomy.Common.DataObjects.OpenSearch
 {
     public interface ISearchResult
     {

@@ -2,26 +2,26 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace NationalArchives.Taxonomy.Common.DataObjects.Elastic
+namespace NationalArchives.Taxonomy.Common.DataObjects.OpenSearch
 {
-    public sealed class ElasticUpdateEventArgs : EventArgs
+    public sealed class OpenSearchUpdateEventArgs : EventArgs
     {
-        public ElasticUpdateEventArgs()
+        public OpenSearchUpdateEventArgs()
         {
                 
         }
 
-        public ElasticUpdateEventArgs(string msg, ElasticUpdateEventType eventType )
+        public OpenSearchUpdateEventArgs(string msg, OpenSearchUpdateEventType eventType )
         {
             Message = msg;
             EventType = eventType;
         }
 
         public string Message { get;}
-        public ElasticUpdateEventType EventType { get;}
+        public OpenSearchUpdateEventType EventType { get;}
     }
 
-    public enum ElasticUpdateEventType
+    public enum OpenSearchUpdateEventType
     {
         FATAL_EXCEPTION,
         PROCESSING_COMPLETE

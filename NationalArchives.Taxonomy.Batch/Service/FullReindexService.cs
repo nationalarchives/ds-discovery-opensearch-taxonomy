@@ -21,7 +21,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
         private readonly ICategoriserService<CategorisationResult> _categoriserService;
         private readonly ILogger<FullReindexService> _logger;
         private readonly IHostApplicationLifetime _hostApplicationLifetime;
-        private readonly FullReindexIaidProducer _iaidsFromElasticProducer;
+        private readonly FullReindexIaidProducer _iaidsFromOpenSearchProducer;
         private readonly FullReIndexIaidPcQueue<string> _reindexIaidQueue;
         private readonly IUpdateStagingQueueSender _updateStagingQueueSender;
 
@@ -52,7 +52,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
 
             _categoriserStartDelay = catParams.CategoriserStartDelay;
             _logIndividualCategorisationResults = catParams.LogEachCategorisationResult;
-            _iaidsFromElasticProducer = iaidProducer;
+            _iaidsFromOpenSearchProducer = iaidProducer;
 
             _reindexIaidQueue = reindexIaidQueue;
 
@@ -66,8 +66,6 @@ namespace NationalArchives.Taxonomy.Batch.Service
 
             _hostApplicationLifetime = hostApplicationLifetime;
         }
-
-
 
         public override Task StopAsync(CancellationToken cancellationToken)
         {
@@ -83,9 +81,9 @@ namespace NationalArchives.Taxonomy.Batch.Service
             base.Dispose();
         }
 
-        private void FullReindexElasticFetch_ProcessingCompleted(object sender, MessageProcessingEventArgs e)
+        private void FullReindexOpenSearchFetch_ProcessingCompleted(object sender, MessageProcessingEventArgs e)
         {
-            _logger.LogInformation("Elastic search fetch completed.");
+            _logger.LogInformation("Open Search fetch completed.");
         }
 
         public void IncrementCategorisationCount(int newResults)
@@ -119,32 +117,27 @@ namespace NationalArchives.Taxonomy.Batch.Service
 
                 Action<int, int> updateQueueProgress = (i, j) => _logger.LogInformation($"{i} assets processed and taxonomy results send to the external update queue.  There are currently {j} taxonomy results in the internal update queue.");
 
-                Task iaidProducerTask = _iaidsFromElasticProducer.InitAsync(stoppingToken);
+                Task iaidProducerTask = _iaidsFromOpenSearchProducer.InitAsync(stoppingToken);
                 tasks.Add(iaidProducerTask);
                 TaskAwaiter iaidFetchawaiter = iaidProducerTask.GetAwaiter();
                 iaidFetchawaiter.OnCompleted(() =>
                 {
                     if (iaidProducerTask.Exception != null)
                     {
-                        string msg = "Error retrieving Information assets from Elastic Search. Please check the logs for errors.";
+                        string msg = "Error retrieving Information assets from Open Search. Please check the logs for errors.";
                         _StopMessage = msg;
                         _logger.LogError(msg);
                         _logger.LogError(iaidProducerTask.Exception.Message);
                         LogInnerExceptions(iaidProducerTask.Exception.InnerExceptions);
-                        //foreach (Exception inner in iaidProducerTask.Exception.InnerExceptions)
-                        //{
-                        //    //_logger.LogError($"Message: { iaidProducerTask.Exception.Message}, stack trace: { iaidProducerTask.Exception.StackTrace}");
-                        //    LogInnerExceptions()
-                        //}
                         StopApplication();
                     }
                     else if (iaidProducerTask.IsCanceled)
                     {
-                        _logger.LogInformation("Fetch of information asset IDs from Elastic search was cancelled.  Please check the logs for errors.");
+                        _logger.LogInformation("Fetch of information asset IDs from Open Search was cancelled.  Please check the logs for errors.");
                     }
                     else
                     {
-                        _logger.LogInformation($"Completed fetch of asset identifiers from Elastic Search. {_iaidsFromElasticProducer.TotalIdentifiersFetched} IAIDs were fetched, current queue size is {_iaidsFromElasticProducer.CurrentQueueSize}");
+                        _logger.LogInformation($"Completed fetch of asset identifiers from Open Search. {_iaidsFromOpenSearchProducer.TotalIdentifiersFetched} IAIDs were fetched, current queue size is {_iaidsFromOpenSearchProducer.CurrentQueueSize}");
                     }
 
                 }
@@ -166,10 +159,8 @@ namespace NationalArchives.Taxonomy.Batch.Service
                     
                 }
 
-                // wait a while to allow some iaids to be fetched from Elastic (set this via appsettings as desired). 
-                // NOw we can start the staging queue, followed
-
-
+                // wait a while to allow some iaids to be fetched from Open Search (set this via appsettings as desired). 
+                // Now we can start the staging queue, followed
 
                 if (_categoriserStartDelay >= 0)
                 {
@@ -185,12 +176,8 @@ namespace NationalArchives.Taxonomy.Batch.Service
                         {
                             string msg = "Error updating the results queue. Please check the logs for errors";
                             _StopMessage = msg;
-                            _logger.LogError(msg);
-                            LogInnerExceptions(resultsQueueUpdateTask.Exception.InnerExceptions);
-                            //foreach (Exception inner in resultsQueueUpdateTask.Exception.InnerExceptions)
-                            //{
-                            //    _logger.LogError($"Message: { resultsQueueUpdateTask.Exception.Message}, stack trace: { resultsQueueUpdateTask.Exception.StackTrace}");
-                            //}
+                            _logger.LogError(resultsQueueUpdateTask.Exception, msg);
+                            LogInnerExceptions(resultsQueueUpdateTask.Exception.Flatten().InnerExceptions);
                             StopApplication();
                         }
 
@@ -219,8 +206,6 @@ namespace NationalArchives.Taxonomy.Batch.Service
                         }
                     }
                     );
-
-
 
                     // Start the full reindex categorisation
                     _categorisationStartTime = DateTime.Now;
@@ -277,12 +262,11 @@ namespace NationalArchives.Taxonomy.Batch.Service
 
                 return Task.CompletedTask;
             }
-
             catch (Exception e)
             {
                 _logger.LogCritical(e.Message);
                 _logger.LogCritical("Fatal exception occured during processing, please check the logs for details.");
-                _logger.LogCritical("Cancelling document feed from elastic search following exception");
+                _logger.LogCritical("Cancelling document feed from Open Search following exception");
                 StopApplication();
                 return Task.FromException(e);
             }
@@ -311,7 +295,6 @@ namespace NationalArchives.Taxonomy.Batch.Service
                 _hostApplicationLifetime.StopApplication();
             }
         }
-
 
         private void OnStarted()
         {

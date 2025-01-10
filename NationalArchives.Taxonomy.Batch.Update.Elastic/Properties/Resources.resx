@@ -117,10 +117,10 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="FlushRemaingUpdatesToElasticMsg" xml:space="preserve">
-    <value>Flushing remaining categorisation updates from the queue to the Elastic Search database.</value>
+  <data name="FlushRemaingUpdatesToOpenSearchMsg" xml:space="preserve">
+    <value>Flushing remaining categorisation updates from the queue to the Open Search database.</value>
   </data>
   <data name="NoMoreCategorisationResultsOnQueueMsg" xml:space="preserve">
-    <value>The Elastic update worker reports that no more categorisation results are available on the queue.  The service will now stop.</value>
+    <value>The Open Search update worker reports that no more categorisation results are available on the queue.  The service will now stop.</value>
   </data>
 </root>

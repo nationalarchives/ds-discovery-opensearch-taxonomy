@@ -3,6 +3,6 @@
     public enum CategorySource
     {
         Mongo,
-        Elastic
+        OpenSearch
     }
 }

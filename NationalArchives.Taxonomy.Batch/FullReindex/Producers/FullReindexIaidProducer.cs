@@ -21,19 +21,19 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
         private FullReIndexIaidPcQueue<string> _pcQueue;
         private readonly IInformationAssetViewService _iaViewService;
         private readonly ILogger<FullReindexService> _logger;
-        private ElasticAssetBrowseParams _elasticAssetBrowseParams;
+        private OpenSearchAssetBrowseParams _openSearchAssetBrowseParams;
 
         internal EventHandler<MessageProcessingEventArgs> ProcessingCompleted;
         internal EventHandler<MessageProcessingEventArgs> FatalException;
 
         private int _totalCount;
 
-        public FullReindexIaidProducer(FullReIndexIaidPcQueue<string> pcQueue, IInformationAssetViewService iaViewService, ElasticAssetBrowseParams elasticAssetFetchParams,ILogger<FullReindexService> logger)
+        public FullReindexIaidProducer(FullReIndexIaidPcQueue<string> pcQueue, IInformationAssetViewService iaViewService, OpenSearchAssetBrowseParams openSearchAssetFetchParams,ILogger<FullReindexService> logger)
         {
             _pcQueue = pcQueue;
             _iaViewService = iaViewService;
             _logger = logger;
-            _elasticAssetBrowseParams = elasticAssetFetchParams;
+            _openSearchAssetBrowseParams = openSearchAssetFetchParams;
         }
 
         public async Task InitAsync(CancellationToken token)
@@ -49,18 +49,18 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
 
                         int totalScrollResults = 0;
 
-                    InformationAssetScrollList informationAssetsList = _iaViewService.BrowseAllDocReferences(browseParams: _elasticAssetBrowseParams, scrollId: null);
+                    InformationAssetScrollList informationAssetsList = _iaViewService.BrowseAllDocReferences(browseParams: _openSearchAssetBrowseParams, scrollId: null);
 
                     string scrollId = informationAssetsList.ScrollId;
 
                     if (String.IsNullOrEmpty(scrollId))
                     {
-                        throw new TaxonomyException(TaxonomyErrorType.ELASTIC_SCROLL_EXCEPTION, "Error scrolling IAIDS in Elastic.  Could not retrieve Elastic Scroll ID");
+                        throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_SCROLL_EXCEPTION, "Error scrolling IAIDS in Open Search.  Could not retrieve Open Search Scroll ID");
                     }
 
                         if (informationAssetsList.ScrollResults.Count == 0)
                         {
-                            throw new TaxonomyException(TaxonomyErrorType.ELASTIC_SCROLL_EXCEPTION, "No results received on initial scroll request.");
+                            throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_SCROLL_EXCEPTION, "No results received on initial scroll request.");
                         }
                         else
                         {
@@ -71,7 +71,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
                             int scrollCount = 1;
 
                             _logger.LogInformation($"Scroll iteration {scrollCount}.  Results this iteration: {informationAssetsList.ScrollResults.Count}.  Total results so far: {totalScrollResults}");
-                            if (_elasticAssetBrowseParams.LogFetchedAssetIds)
+                            if (_openSearchAssetBrowseParams.LogFetchedAssetIds)
                             {
                                 LogScrollResults(informationAssetsList, scrollCount);
                             }
@@ -83,7 +83,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
                             {
                                 scrollCount++;
 
-                                informationAssetsList = _iaViewService.BrowseAllDocReferences(browseParams: _elasticAssetBrowseParams, scrollId: scrollId);
+                                informationAssetsList = _iaViewService.BrowseAllDocReferences(browseParams: _openSearchAssetBrowseParams, scrollId: scrollId);
 
                                 if (informationAssetsList.ScrollResults?.Count > 0)
                                 {
@@ -91,7 +91,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
 
                                     if (String.IsNullOrEmpty(informationAssetsList.ScrollId))
                                     {
-                                        throw new TaxonomyException(TaxonomyErrorType.ELASTIC_SCROLL_EXCEPTION, "error during scrolling IAIDs from Elastic - could not retrieve scroll ID.");
+                                        throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_SCROLL_EXCEPTION, "error during scrolling IAIDs from Open Search - could not retrieve scroll ID.");
                                     }
                                     else
                                     {
@@ -100,7 +100,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
                                     }
 
                                     _logger.LogInformation($"Scroll iteration {scrollCount}.  Results this iteration: {informationAssetsList.ScrollResults.Count}.  Total results so far: {totalScrollResults}");
-                                    if (_elasticAssetBrowseParams.LogFetchedAssetIds)
+                                    if (_openSearchAssetBrowseParams.LogFetchedAssetIds)
                                     {
                                         LogScrollResults(informationAssetsList, scrollCount);
                                     }
@@ -108,14 +108,14 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
                                 }
                                 else
                                 {
-                                    StringBuilder sb = new StringBuilder($"No asset identifier results received from Elastic Search scroll cursor on scroll count {scrollCount}.  Total results so far {totalScrollResults}. ");
+                                    StringBuilder sb = new StringBuilder($"No asset identifier results received from Open Search scroll cursor on scroll count {scrollCount}.  Total results so far {totalScrollResults}. ");
                                     if (token.IsCancellationRequested)
                                     {
-                                        sb.Append("Cancellation of Elastic Search scroll was requested.");
+                                        sb.Append("Cancellation of Open Search scroll was requested.");
                                     }
                                     else
                                     {
-                                        sb.Append("Cancellation of Elastic Search scroll was not requested.");
+                                        sb.Append("Cancellation of Open Search scroll was not requested.");
                                     }
                                     _logger.LogInformation(sb.ToString());
                                 }
@@ -142,12 +142,12 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
 
                             if (!token.IsCancellationRequested)
                             {
-                                string completionMessage =  "Fetch of IAIDs from Elastic search to processing queue completed.";
+                                string completionMessage =  "Fetch of IAIDs from Open Search to processing queue completed.";
                                 _logger.LogInformation(completionMessage); 
                             }
                             else
                             {
-                                string cancelMessage = "Fetch of source information assets from Elastic search for categorisation was cancelled by the caller.";
+                                string cancelMessage = "Fetch of source information assets from Open Search for categorisation was cancelled by the caller.";
                                 throw new OperationCanceledException(cancelMessage, token);
                             }
                         }

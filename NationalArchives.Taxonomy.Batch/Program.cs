@@ -11,12 +11,12 @@ using NationalArchives.Taxonomy.Batch.FullReindex.Producers;
 using NationalArchives.Taxonomy.Batch.FullReindex.Queues;
 using NationalArchives.Taxonomy.Batch.Service;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
+using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Queue;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
-using NationalArchives.Taxonomy.Common.Domain.Repository.Elastic;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Lucene;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Mongo;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using NationalArchives.Taxonomy.Common.Service;
 using NLog.Extensions.Logging;
 using System;
@@ -53,7 +53,8 @@ namespace NationalArchives.Taxonomy.Batch
                     serviceLogger.LogInformation("Starting the taxonomy generator.");
                 }
 
-                CreateHostBuilder(args).Build().Run();
+                var builder = CreateHostBuilder(args);
+                builder.Build().Run();
             }
             catch (Exception e)
             {
@@ -86,6 +87,7 @@ namespace NationalArchives.Taxonomy.Batch
                 }).ConfigureAppConfiguration((hostingContext, config) =>
                 {
                     config.AddEnvironmentVariables("TAXONOMY_");
+                    config.AddUserSecrets<Program>();
                 }).UseWindowsService();
 
         private static void ConfigureServicesForHost(HostBuilderContext context, IServiceCollection services)
@@ -104,7 +106,6 @@ namespace NationalArchives.Taxonomy.Batch
 
             CategorisationParams categorisationParams = config.GetSection(categorisationParamsConfigSource).Get<CategorisationParams>();
 
-
             services.AddAutoMapper(mc => mc.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }));
 
             services.AddSingleton<ILoggerFactory, LoggerFactory>();
@@ -115,30 +116,26 @@ namespace NationalArchives.Taxonomy.Batch
             services.AddSingleton(typeof(ILogger<DailyUpdatesManagerService>), typeof(Logger<DailyUpdatesManagerService>));
             services.AddSingleton(typeof(ILogger<Analyzer>), typeof(Logger<Analyzer>));
             services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
-            if (_operationMode == OperationMode.Full_Reindex)
-            {
-                services.AddSingleton(typeof(ILogger<IUpdateStagingQueueSender>), typeof(Logger<ActiveMqUpdateSender>)); 
-            }
-
-
-            DiscoverySearchElasticConnectionParameters discoverySearchElasticConnParams = config.GetSection("DiscoveryElasticParams").Get<DiscoverySearchElasticConnectionParameters>();
+  
+            DiscoveryOpenSearchConnectionParameters discoveryOpenSearchConnParams = config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>();
            
-
             services.AddSingleton<CategorisationParams>(categorisationParams);
             // Need to add as a service as FullReindexService and DailyUpdate service are instantiated via AddHostedService where we can't pass parameters directly.
 
             CategoriserLuceneParams categoriserLuceneParams = config.GetSection("CategoriserLuceneParams").Get<CategoriserLuceneParams>();
 
-
             //params for update staging queue.
-            UpdateStagingQueueParams updateStagingQueueParams = config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>();
-            services.AddSingleton<UpdateStagingQueueParams>(updateStagingQueueParams);
+            //UpdateStagingQueueParams updateStagingQueueParams = config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>();
+            //services.AddSingleton<UpdateStagingQueueParams>(updateStagingQueueParams);
+
+            AmazonSqsStagingQueueParams awsSqsParams = config.GetSection("AmazonSqsParams").Get<AmazonSqsStagingQueueParams>();
+            services.AddSingleton<AmazonSqsStagingQueueParams>(awsSqsParams);
 
             // IAIDs connection info
-            services.AddTransient<IConnectElastic<ElasticRecordAssetView>>((ctx) =>
+            services.AddTransient<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) =>
             {
-                IConnectElastic<ElasticRecordAssetView> recordAssetsElasticConnection = new ElasticConnection<ElasticRecordAssetView>(discoverySearchElasticConnParams);
-                return recordAssetsElasticConnection;
+                IConnectOpenSearch<OpenSearchRecordAssetView> recordAssetsOpenSearchConnection = new OpenSearchConnection<OpenSearchRecordAssetView>(discoveryOpenSearchConnParams);
+                return recordAssetsOpenSearchConnection;
             });
 
 
@@ -147,33 +144,33 @@ namespace NationalArchives.Taxonomy.Batch
             services.AddTransient<IIAViewRepository>((ctx) =>
             {
                 IMapper mapper = ctx.GetRequiredService<IMapper>();
-                IConnectElastic<ElasticRecordAssetView> elasticConnectionInfo = ctx.GetRequiredService<IConnectElastic<ElasticRecordAssetView>>();
+                IConnectOpenSearch<OpenSearchRecordAssetView> openSearchConnectionInfo = ctx.GetRequiredService<IConnectOpenSearch<OpenSearchRecordAssetView>>();
                 LuceneHelperTools luceneHelperTools = ctx.GetRequiredService<LuceneHelperTools>();
-                ElasticIAViewRepository iaRepo = new ElasticIAViewRepository(elasticConnectionInfo, luceneHelperTools, mapper);
+                OpenSearchIAViewRepository iaRepo = new OpenSearchIAViewRepository(openSearchConnectionInfo, luceneHelperTools, mapper);
                 return iaRepo;
             });
 
 
             CategorySource categorySource = (CategorySource)Enum.Parse(typeof(CategorySource), config.GetValue<string>("CategorySource"));
-            // Get the categories form either Mongo or Elastic
+            // Get the categories form either Mongo or open Search
             switch(categorySource)
             {
-                case CategorySource.Elastic:
+                case CategorySource.OpenSearch:
 
                     // Categories connection info
-                    services.AddTransient<IConnectElastic<CategoryFromElastic>>((ctx) =>
+                    services.AddTransient<IConnectOpenSearch<CategoryFromOpenSearch>>((ctx) =>
                     {
-                        CategoryDataElasticConnectionParameters categoryDataElasticConnParams = config.GetSection("CategoryElasticParams").Get<CategoryDataElasticConnectionParameters>();
-                        IConnectElastic<CategoryFromElastic> categoriesElasticConnection = new ElasticConnection<CategoryFromElastic>(categoryDataElasticConnParams);
-                        return categoriesElasticConnection;
+                        CategoryDataOpenSearchConnectionParameters categoryDataOpenSearchConnParams = config.GetSection("CategoryOpenSearchParams").Get<CategoryDataOpenSearchConnectionParameters>();
+                        IConnectOpenSearch<CategoryFromOpenSearch> categoriesOpenSearchConnection = new OpenSearchConnection<CategoryFromOpenSearch>(categoryDataOpenSearchConnParams);
+                        return categoriesOpenSearchConnection;
                     });
 
                     // category list repo using category connection info.
-                    services.AddTransient<ICategoryRepository, ElasticCategoryRepository>((ctx) =>
+                    services.AddTransient<ICategoryRepository, OpenSearchCategoryRepository>((ctx) =>
                     {
                         IMapper mapper = ctx.GetRequiredService<IMapper>();
-                        IConnectElastic<CategoryFromElastic> elasticConnectionInfo = ctx.GetRequiredService<IConnectElastic<CategoryFromElastic>>();
-                        ElasticCategoryRepository categoryRepo = new ElasticCategoryRepository(elasticConnectionInfo, mapper);
+                        IConnectOpenSearch<CategoryFromOpenSearch> openSearchConnectionInfo = ctx.GetRequiredService<IConnectOpenSearch<CategoryFromOpenSearch>>();
+                        OpenSearchCategoryRepository categoryRepo = new OpenSearchCategoryRepository(openSearchConnectionInfo, mapper);
                         return categoryRepo;
                     });
 
@@ -181,7 +178,7 @@ namespace NationalArchives.Taxonomy.Batch
 
                 case CategorySource.Mongo:
                     //Mongo categories
-                    services.AddTransient<ICategoryRepository, MongoCategoryRepository>((ctx) =>
+                    services.AddSingleton<ICategoryRepository, MongoCategoryRepository>((ctx) =>
                     {
                         IMapper mapper = ctx.GetRequiredService<IMapper>();
                         MongoConnectionParams categoryDataMongoConnParams = config.GetSection("CategoryMongoParams").Get<MongoConnectionParams>();
@@ -220,16 +217,21 @@ namespace NationalArchives.Taxonomy.Batch
                 services.AddSingleton<IUpdateStagingQueueSender>((ctx) =>
                 {
                     var logger = ctx.GetRequiredService<ILogger<IUpdateStagingQueueSender>>();
-                    UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
-                    return new ActiveMqUpdateSender(qParams, logger);
+                    //UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                    //return new ActiveMqUpdateSender(qParams, logger);
+                    AmazonSqsStagingQueueParams qParams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
+                    return new AmazonSqsUpdateSender(qParams, logger);
                 }); 
             }
             else
             {
                 services.AddSingleton<IUpdateStagingQueueSender>((ctx) =>
                 {
-                    UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
-                    return new ActiveMqDirectUpdateSender(qParams);
+                    //UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                    //return new ActiveMqDirectUpdateSender(qParams);
+                    AmazonSqsStagingQueueParams qParams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
+                    var logger = ctx.GetRequiredService<ILogger<IUpdateStagingQueueSender>>();
+                    return new AmazonSqsDirectUpdateSender(qParams, logger);
                 });
             }
 
@@ -273,11 +275,11 @@ namespace NationalArchives.Taxonomy.Batch
             {
                services.AddSingleton<FullReIndexIaidPcQueue<string>>((ctx) =>
                {
-                   UpdateStagingQueueParams qparams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                   var qparams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
                    return new FullReIndexIaidPcQueue<string>(qparams.MaxSize);
                }); // =>  FullReindexService
 
-                var eElasticAssetBrowseParams = config.GetSection("ElasticAssetFetchParams").Get<ElasticAssetBrowseParams>();
+                var openSearchAssetBrowseParams = config.GetSection("OpenSearchAssetFetchParams").Get<OpenSearchAssetBrowseParams>();
 
                 services.AddSingleton<FullReindexIaidProducer>((ctx) =>
                 {
@@ -285,7 +287,7 @@ namespace NationalArchives.Taxonomy.Batch
                     var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
                     var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
 
-                    return new FullReindexIaidProducer(reindexQueue, iaViewService, eElasticAssetBrowseParams, logger);
+                    return new FullReindexIaidProducer(reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
                 });
                     
                 services.AddHostedService<FullReindexService>();

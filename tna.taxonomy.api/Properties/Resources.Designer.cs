@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch.Properties {
+namespace tna.taxonomy.api.Properties {
     using System;
     
     
@@ -39,7 +39,7 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch.Properties {
         internal static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
-                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("NationalArchives.Taxonomy.Batch.Update.OpenSearch.Properties.Resources", typeof(Resources).Assembly);
+                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("tna.taxonomy.api.Properties.Resources", typeof(Resources).Assembly);
                     resourceMan = temp;
                 }
                 return resourceMan;
@@ -57,24 +57,6 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch.Properties {
             }
             set {
                 resourceCulture = value;
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Flushing remaining categorisation updates from the queue to the Open Search database..
-        /// </summary>
-        internal static string FlushRemaingUpdatesToOpenSearchMsg {
-            get {
-                return ResourceManager.GetString("FlushRemaingUpdatesToOpenSearchMsg", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The Open Search update worker reports that no more categorisation results are available on the queue.  The service will now stop..
-        /// </summary>
-        internal static string NoMoreCategorisationResultsOnQueueMsg {
-            get {
-                return ResourceManager.GetString("NoMoreCategorisationResultsOnQueueMsg", resourceCulture);
             }
         }
     }

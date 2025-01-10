@@ -1,6 +1,6 @@
 ﻿using AutoMapper;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.DataObjects.Elastic;
+using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using NationalArchives.Taxonomy.Common.DataObjects.Mongo;
 using NationalArchives.Taxonomy.Common.Domain;
 
@@ -10,7 +10,7 @@ namespace NationalArchives.Taxonomy.Common.Mappers
     {
         public MappingProfile()
         {
-            CreateMap<ElasticRecordAssetView, InformationAssetView>()
+            CreateMap<OpenSearchRecordAssetView, InformationAssetView>()
                 .ForMember(dest => dest.CoveringDates, opt => opt.MapFrom(source => source.COVERING_DATES))
                 .ForMember(dest => dest.Description, opt => opt.MapFrom(source => source.DESCRIPTION))
                 .ForMember(dest => dest.Title, opt => opt.MapFrom(source => source.TITLE))
@@ -25,12 +25,12 @@ namespace NationalArchives.Taxonomy.Common.Mappers
                 .ForMember(dest => dest.Subjects, opt => opt.MapFrom(source => source.SUBJECT))
                 .ForMember(dest => dest.DocReference, opt => opt.MapFrom(source => source.ID))
                 .ForMember(dest => dest.ContextDescription, opt => opt.MapFrom(source => source.CONTEXT)).IncludeAllDerived()
-                .Include<ElasticRecordAssetView, InformationAssetViewWithScore>().ReverseMap();
+                .Include<OpenSearchRecordAssetView, InformationAssetViewWithScore>().ReverseMap();
 
-            CreateMap<ElasticRecordAssetView, InformationAssetViewWithScore>()
+            CreateMap<OpenSearchRecordAssetView, InformationAssetViewWithScore>()
                 .ForMember(dest => dest.Score, opt => opt.MapFrom(source => source.Score)).ReverseMap();
 
-            CreateMap<CategoryFromElastic, Category>()
+            CreateMap<CategoryFromOpenSearch, Category>()
                 .ForMember(dest => dest.Id, opt => opt.MapFrom(source => source.ID))
                 .ForMember(dest => dest.Title, opt => opt.MapFrom(source => source.title))
                 .ForMember(dest => dest.Query, opt => opt.MapFrom(source => source.query_text))

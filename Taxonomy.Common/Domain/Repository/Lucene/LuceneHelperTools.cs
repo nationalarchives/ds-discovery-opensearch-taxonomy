@@ -9,7 +9,7 @@ using Lucene.Net.Search;
 using Lucene.Net.Util;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using el = NationalArchives.Taxonomy.Common.Domain.Repository.Elastic;
+using el = NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -225,7 +225,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
 
             switch (defaultTaxonomyField)
             {
-                case el.ElasticFieldConstants.TEXT_NO_CAS_NO_PUNC:
+                case el.OpenSearchFieldConstants.TEXT_NO_CAS_NO_PUNC:
                     // IAViewTextNoCasNoPuncAnalyser
                     services.AddTransient<Analyzer>((ctx) =>
                     {
@@ -233,7 +233,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                         return new IAViewTextNoCasNoPuncAnalyser(synonymFilterFactory, wordDelimiterFilterFactory, AnalyzerType.INDEX, logger);
                     });
                     break;
-                case el.ElasticFieldConstants.TEXT_CAS_NO_PUNC:
+                case el.OpenSearchFieldConstants.TEXT_CAS_NO_PUNC:
                     // IAViewTextCasNoPuncAnalyser
                     services.AddTransient<Analyzer>((ctx) =>
                     {
@@ -241,7 +241,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                         return new IAViewTextCasNoPuncAnalyser(synonymFilterFactory, wordDelimiterFilterFactory, AnalyzerType.INDEX, logger);
                     });
                     break;
-                case el.ElasticFieldConstants.TEXT_CAS_PUNC:
+                case el.OpenSearchFieldConstants.TEXT_CAS_PUNC:
                     // IAViewTextCasPuncAnalyser
                     services.AddTransient<Analyzer>((ctx) =>
                     {
@@ -249,7 +249,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                         return new IAViewTextCasPuncAnalyser(stopFilterFactory, synonymFilterFactory, AnalyzerType.INDEX, logger);
                     });
                     break;
-                case el.ElasticFieldConstants.TEXT_GEN:
+                case el.OpenSearchFieldConstants.TEXT_GEN:
                     services.AddTransient<Analyzer>((ctx) =>
                     {
                         ILogger<Analyzer> logger = ctx.GetRequiredService<ILogger<Analyzer>>();

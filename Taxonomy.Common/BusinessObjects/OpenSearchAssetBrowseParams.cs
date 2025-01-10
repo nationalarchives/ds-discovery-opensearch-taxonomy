@@ -5,7 +5,7 @@ using System.Text;
 
 namespace NationalArchives.Taxonomy.Common.BusinessObjects
 {
-    public class ElasticAssetBrowseParams
+    public class OpenSearchAssetBrowseParams
     {
         public int PageSize { get; set; }
         public int  ScrollTimeout { get; set; }

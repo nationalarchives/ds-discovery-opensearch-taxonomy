@@ -268,3 +268,5 @@ aws-logger-errors.txt
 /Dockerfile_web
 /Dockerfile_api
 /run
+/NationalArchives.Taxonomy.Batch.Update.Elastic/Properties/launchSettings.json
+/tna.taxonomy.api/Properties/launchSettings.json

@@ -7,7 +7,6 @@ using NationalArchives.Taxonomy.Common.Domain.Queue;
 using NationalArchives.Taxonomy.Common.Service;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -166,7 +165,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
                     
                     if (_taxonomyExceptionThreshold > 0 && _taxonomyExceptionCount >= _taxonomyExceptionThreshold)
                     {
-                        throw new TaxonomyException(TaxonomyErrorType.ELASTIC_INVALID_RESPONSE, $"Processing cannot continue as the configured taxonomy exception count of {_taxonomyExceptionThreshold} has been reached.", ex);
+                        throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_INVALID_RESPONSE, $"Processing cannot continue as the configured taxonomy exception count of {_taxonomyExceptionThreshold} has been reached.", ex);
                     }
                     else
                     {
@@ -181,7 +180,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
 
                         if (_taxonomyExceptionThreshold > 0 && _taxonomyExceptionCount >= _taxonomyExceptionThreshold)
                         {
-                            throw new TaxonomyException(TaxonomyErrorType.ELASTIC_INVALID_RESPONSE, $"Processing cannot continue as the configured taxonomy exception count of {_taxonomyExceptionThreshold} has been reached.", ex);
+                            throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_INVALID_RESPONSE, $"Processing cannot continue as the configured taxonomy exception count of {_taxonomyExceptionThreshold} has been reached.", ex);
                         }
                         else
                         {
@@ -331,7 +330,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
 
                     if(_taxonomyExceptionThreshold > 0 && _taxonomyExceptionCount >= _taxonomyExceptionThreshold)
                     {
-                        throw new TaxonomyException(TaxonomyErrorType.ELASTIC_INVALID_RESPONSE, $"Processing cannot continue as the configured taxonomy exception count of {_taxonomyExceptionThreshold} has been reached.", ex);
+                        throw new TaxonomyException(TaxonomyErrorType.OPEN_SEARCH_INVALID_RESPONSE, $"Processing cannot continue as the configured taxonomy exception count of {_taxonomyExceptionThreshold} has been reached.", ex);
                     }
                 }
                 catch (Exception ex)

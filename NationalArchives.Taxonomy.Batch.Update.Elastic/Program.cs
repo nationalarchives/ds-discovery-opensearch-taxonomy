@@ -1,25 +1,22 @@
-﻿using AutoMapper;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.EventLog;
-using NationalArchives.Taxonomy.Batch.Update.Elastic.Service;
+using NationalArchives.Taxonomy.Batch.Update.OpenSearch.Service;
 using NationalArchives.Taxonomy.Common.Domain.Queue;
-using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
-using NationalArchives.Taxonomy.Common.Domain.Repository.Elastic;
-using NationalArchives.Taxonomy.Common.Domain.Repository.Mongo;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using NationalArchives.Taxonomy.Common.Service.Impl;
 using NationalArchives.Taxonomy.Common.Service.Interface;
 using NLog.Extensions.Logging;
 using System;
 using System.Text;
 
-namespace NationalArchives.Taxonomy.Batch.Update.Elastic
+namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch
 {
     class Program
     {
-        private const string EVENT_SOURCE = "Taxonomy Elastic Search Update";
+        private const string EVENT_SOURCE = "Taxonomy Open Search Update";
 
         public static void Main(string[] args)
         {
@@ -33,14 +30,14 @@ namespace NationalArchives.Taxonomy.Batch.Update.Elastic
                 using (var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole().AddDebug().AddEventSourceLogger().AddEventLog(eventLogSettings)))
                 {
                     serviceLogger = loggerFactory.CreateLogger<Program>();
-                    serviceLogger.LogInformation("Starting the taxonomy elastic update service.");
+                    serviceLogger.LogInformation("Starting the taxonomy Open Search update service.");
                 }
 
                 CreateHostBuilder(args).Build().Run();
             }
             catch (Exception e)
             {
-                StringBuilder sb = new StringBuilder("An error occurred whilst initialising or running the taxonomy elastic search update:");
+                StringBuilder sb = new StringBuilder("An error occurred whilst initialising or running the taxonomy Open Search update:");
                 sb.Append("\n");
                 sb.Append("Error: " + e.Message);
                 sb.Append("\n");
@@ -68,6 +65,7 @@ namespace NationalArchives.Taxonomy.Batch.Update.Elastic
                 }).ConfigureAppConfiguration((hostingContext, config) =>
                 {
                     config.AddEnvironmentVariables("TAXONOMY_");
+                    config.AddUserSecrets<Program>();
                 }).UseWindowsService();
 
 
@@ -75,38 +73,43 @@ namespace NationalArchives.Taxonomy.Batch.Update.Elastic
         {
             IConfiguration config = context.Configuration;
 
-            var elasticUpdateParams = config.GetSection(nameof(ElasticUpdateParams)).Get<ElasticUpdateParams>();
-            var stagingQueueParams = config.GetSection(nameof(UpdateStagingQueueParams)).Get<UpdateStagingQueueParams>();
-            var updateElasticConnParams = config.GetSection(nameof(UpdateElasticConnectionParameters)).Get<UpdateElasticConnectionParameters>();
+            var openSearchUpdateParams = config.GetSection(nameof(OpenSearchUpdateParams)).Get<OpenSearchUpdateParams>();
 
-            services.AddSingleton(typeof(ILogger<UpdateElasticWindowsService>), typeof(Logger<UpdateElasticWindowsService>));
-            services.AddSingleton(typeof(ILogger<UpdateElasticService>), typeof(Logger<UpdateElasticService>));
+            //var stagingQueueParams = config.GetSection(nameof(UpdateStagingQueueParams)).Get<UpdateStagingQueueParams>();
+            var stagingQueueParams = config.GetSection("AmazonSqsParams").Get<AmazonSqsStagingQueueParams>();
 
+            var updateOpenSearchConnParams = config.GetSection(nameof(UpdateOpenSearchConnectionParameters)).Get<UpdateOpenSearchConnectionParameters>();
+
+            services.AddSingleton(typeof(ILogger<UpdateOpenSearchWindowsService>), typeof(Logger<UpdateOpenSearchWindowsService>));
+            services.AddSingleton(typeof(ILogger<UpdateOpenSearchService>), typeof(Logger<UpdateOpenSearchService>));
 
             //Staging queue for updates.  Needs to be a singleton or we get multiple consumers!
             services.AddSingleton<IUpdateStagingQueueReceiver>((ctx) =>
             {
-                return new ActiveMqUpdateReceiver(stagingQueueParams);
+                return new AmazonSqsUpdateReceiver(stagingQueueParams);
             });
 
-            services.AddTransient<IElasticIAViewUpdateRepository, ElasticIAViewUpdateRepository>((ctx) =>
+            services.AddTransient<IOpenSearchIAViewUpdateRepository, OpenSearchIAViewUpdateRepository>((ctx) =>
             {
-                return new ElasticIAViewUpdateRepository(updateElasticConnParams);
+                return new OpenSearchIAViewUpdateRepository(updateOpenSearchConnParams);
             });
 
-            services.AddSingleton<IUpdateElasticService>((ctx) =>
+            services.AddSingleton<IUpdateOpenSearchService>((ctx) =>
             {
-                uint bulkUpdateBatchSize = elasticUpdateParams.BulkUpdateBatchSize;
-                uint queueFetchWaitTime = elasticUpdateParams.QueueFetchSleepTime;
-                Console.WriteLine($"Using a batch size of {bulkUpdateBatchSize} and a queue fetch interval of {queueFetchWaitTime} sceonds for Elastic bulk updates.");
+                int bulkUpdateBatchSize = openSearchUpdateParams.BulkUpdateBatchSize;
+                int queueFetchWaitTime = openSearchUpdateParams.QueueFetchSleepTime;
+                int searchDatabaseUpdateInterval = openSearchUpdateParams.SearchDatabaseUpdateInterval;
+                int maxInternalQueueSize = openSearchUpdateParams.MaxInternalQueueSize;
+
+                Console.WriteLine($"Using a batch size of {bulkUpdateBatchSize} and a queue fetch interval of {queueFetchWaitTime} sceonds for Open Search bulk updates.");
 
                 IUpdateStagingQueueReceiver interimQueue = ctx.GetRequiredService<IUpdateStagingQueueReceiver>();  
-                IElasticIAViewUpdateRepository updateRepo = ctx.GetRequiredService<IElasticIAViewUpdateRepository>();
-                ILogger<UpdateElasticService> logger = ctx.GetRequiredService<ILogger<UpdateElasticService>>();
-                return new UpdateElasticService(interimQueue, updateRepo, logger, bulkUpdateBatchSize, queueFetchWaitTime);
+                IOpenSearchIAViewUpdateRepository updateRepo = ctx.GetRequiredService<IOpenSearchIAViewUpdateRepository>();
+                ILogger<UpdateOpenSearchService> logger = ctx.GetRequiredService<ILogger<UpdateOpenSearchService>>();
+                return new UpdateOpenSearchService(interimQueue, updateRepo, logger, bulkUpdateBatchSize, queueFetchWaitTime, searchDatabaseUpdateInterval, maxInternalQueueSize);
             });
 
-            services.AddHostedService<UpdateElasticWindowsService>();
+            services.AddHostedService<UpdateOpenSearchWindowsService>();
 
             ServiceProvider provider = services.BuildServiceProvider();
         }

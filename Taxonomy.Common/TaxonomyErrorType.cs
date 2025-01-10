@@ -40,18 +40,21 @@
          */
         JMS_EXCEPTION,
 
+        // Amazon SQS
+        SQS_EXCEPTION,
+
         /**
          * Document was not found in lucene Index
          */
         DOC_NOT_FOUND,
 
-        ELASTIC_SCROLL_EXCEPTION,
+        OPEN_SEARCH_SCROLL_EXCEPTION,
 
-        ELASTIC_INVALID_RESPONSE,
+        OPEN_SEARCH_INVALID_RESPONSE,
 
-        ELASTIC_UPDATE_ERROR,
+        OPEN_SEARCH_UPDATE_ERROR,
 
-        ELASTIC_BULK_UPDATE_ERROR,
+        OPEN_SEARCH_BULK_UPDATE_ERROR,
 
         FULL_REINDEX_WORKER_EXCEPTION,
 
