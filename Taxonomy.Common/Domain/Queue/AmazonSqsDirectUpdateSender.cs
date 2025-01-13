@@ -14,34 +14,28 @@ using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
-    public class AmazonSqsDirectUpdateSender : IUpdateStagingQueueSender, IDisposable
+    public class AmazonSqsDirectUpdateSender : IUpdateStagingQueueSender
     {
-        private readonly ConnectionFactory m_ConnectionFactory;
-        private readonly IConnection m_Connection;
-        private readonly ISession m_Session;
-        private readonly IDestination m_destination;
-        private readonly IMessageProducer m_Producer;
-
         private bool _addingCompleted;
 
-        private readonly AmazonSqsStagingQueueParams _qParams;
+        private readonly AmazonSqsParams _sqsParams;
         private readonly ILogger<IUpdateStagingQueueSender> _logger;
 
         private const string ROLE_SESSION_NAME = "Taxonomy_SQS_Update";
 
         /// <summary>
         /// Implementation of IUpdateStagingQueueSender where updates are sent
-        /// directly to an ActiveMQ instance.
+        /// directly to an Amazon SQS instance.
         /// </summary>
-        /// <param name="qParams"></param>
-        public AmazonSqsDirectUpdateSender(AmazonSqsStagingQueueParams qParams, ILogger<IUpdateStagingQueueSender> logger)
+        /// <param name="updateQueueParams"></param>
+        public AmazonSqsDirectUpdateSender(UpdateStagingQueueParams updateQueueParams, ILogger<IUpdateStagingQueueSender> logger)
         {
-            if(!qParams.PostUpdates)
+            if(!updateQueueParams.PostUpdates)
             {
                 return;
             }
 
-            _qParams = qParams;
+            _sqsParams = updateQueueParams.AmazonSqsParams;
             _logger = logger;   
         }
 
@@ -58,6 +52,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         /// <returns>Returns true for compatibility with other possible queue implemenations on the same interface</returns>
         public bool Enqueue(IaidWithCategories item, CancellationToken token)
         {
+
+
             if(token.IsCancellationRequested)
             {
                 return false;
@@ -67,39 +63,21 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
                 throw new TaxonomyException("No item supplied for interim queue update request!");
             }
+
+            AmazonSQSClient client = null;
             try
             {
                 var itemAsList = new List<IaidWithCategories>() { item };
+                
+                RegionEndpoint region = RegionEndpoint.GetBySystemName(_sqsParams.Region);
 
-                AmazonSQSClient client;
-                RegionEndpoint region = RegionEndpoint.GetBySystemName(_qParams.Region);
-
-                if (!_qParams.UseIntegratedSecurity)
-                {
-                    AWSCredentials credentials = null;
-
-                    if (!String.IsNullOrEmpty(_qParams.SessionToken))
-                    {
-                        credentials = new SessionAWSCredentials(awsAccessKeyId: _qParams.AccessKey, awsSecretAccessKey: _qParams.SecretKey, _qParams.SessionToken);
-                    }
-                    else
-                    {
-                        credentials = new BasicAWSCredentials(accessKey: _qParams.AccessKey, secretKey: _qParams.SecretKey);
-                    }
-
-                    AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, _qParams.RoleArn, ROLE_SESSION_NAME);
-
-                    client = new AmazonSQSClient(aWSAssumeRoleCredentials, region);
-                }
-                else
-                {
-                    client = new AmazonSQSClient(region);
-                }
+                AWSCredentials credentials = _sqsParams.GetCredentials(ROLE_SESSION_NAME);
+                client = new AmazonSQSClient(credentials, region);
 
                 var request = new SendMessageRequest()
                 {
                     MessageBody = JsonConvert.SerializeObject(itemAsList),
-                    QueueUrl = _qParams.QueueUrl,
+                    QueueUrl = _sqsParams.QueueUrl,
                 };
 
                 var awaiter = client.SendMessageAsync(request).GetAwaiter();
@@ -111,6 +89,10 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
                 throw;
             }
+            finally
+            {
+                client?.Dispose();
+            }
         }
 
         public bool IsAddingCompleted
@@ -120,17 +102,14 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         public IReadOnlyCollection<string> QueueUpdateErrors => throw new NotImplementedException();
 
-        public void Dispose()
-        {
-            m_Producer?.Dispose();
-            m_Session?.Dispose();
-            m_Connection?.Dispose();
-        }
-
-
         public void CompleteAdding()
         {
             _addingCompleted = true;
+        }
+
+        void IDisposable.Dispose()
+        {
+            
         }
     }
 }

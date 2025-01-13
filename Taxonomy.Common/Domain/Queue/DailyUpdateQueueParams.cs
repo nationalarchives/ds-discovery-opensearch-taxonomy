@@ -1,8 +1,12 @@
-﻿namespace NationalArchives.Taxonomy.Common.Domain.Queue
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
-    public class UpdateStagingQueueParams
+    public class DailyUpdateQueueParams
     {
-        public AmazonSqsParams AmazonSqsParams { get; set;}
+        public AmazonSqsParams AmazonSqsParams { get; set; }
 
         public int WorkerCount { get; set; } = 1;
 
@@ -13,7 +17,5 @@
         public bool EnableVerboseLogging { get; set; }
 
         public bool PostUpdates { get; set; }
-
-        public int SendIntervalMilliseconds { get; set; }
     }
 }

@@ -155,18 +155,18 @@ namespace NationalArchives.Taxonomy.CLI
             if (hasLiveUpdates)
             {
                 //params for update staging queue.
-                //services.AddSingleton<UpdateStagingQueueParams>(config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>());
-                AmazonSqsStagingQueueParams awsSqsParams = config.GetSection("AmazonSqsParams").Get<AmazonSqsStagingQueueParams>();
-                services.AddSingleton<AmazonSqsStagingQueueParams>(awsSqsParams);
+                services.AddSingleton<UpdateStagingQueueParams>(config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>());
+                //AmazonSqsParams awsSqsParams = config.GetSection("AmazonSqsParams").Get<AmazonSqsParams>();
+                //services.AddSingleton<AmazonSqsParams>(awsSqsParams);
 
                 services.AddSingleton(typeof(ILogger<IUpdateStagingQueueSender>), typeof(Logger<AmazonSqsUpdateSender>));
 
                 services.AddSingleton<IUpdateStagingQueueSender>((ctx) =>
                 {
-                    //UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                    UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
                     //return new ActiveMqDirectUpdateSender(qParams);
 
-                    AmazonSqsStagingQueueParams qParams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
+                    //AmazonSqsMessageQueueParams qParams = ctx.GetRequiredService<AmazonSqsMessageQueueParams>();
                     var logger = ctx.GetRequiredService<ILogger<IUpdateStagingQueueSender>>();
                     return new AmazonSqsDirectUpdateSender(qParams, logger);
                 }); 

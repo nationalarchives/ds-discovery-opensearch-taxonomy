@@ -110,10 +110,7 @@ namespace NationalArchives.Taxonomy.Batch
 
             services.AddSingleton<ILoggerFactory, LoggerFactory>();
             services.AddSingleton(typeof(ILogger<Program>), typeof(Logger<Program>));
-            services.AddSingleton(typeof(ILogger<CategoriseDocActiveMqConsumer>), typeof(Logger<CategoriseDocActiveMqConsumer>));
-            services.AddSingleton(typeof(ILogger<DeleteDocActiveMqConsumer>), typeof(Logger<DeleteDocActiveMqConsumer>));
-            services.AddSingleton(typeof(ILogger<FullReindexService>), typeof(Logger<FullReindexService>));
-            services.AddSingleton(typeof(ILogger<DailyUpdatesManagerService>), typeof(Logger<DailyUpdatesManagerService>));
+
             services.AddSingleton(typeof(ILogger<Analyzer>), typeof(Logger<Analyzer>));
             services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
   
@@ -123,13 +120,7 @@ namespace NationalArchives.Taxonomy.Batch
             // Need to add as a service as FullReindexService and DailyUpdate service are instantiated via AddHostedService where we can't pass parameters directly.
 
             CategoriserLuceneParams categoriserLuceneParams = config.GetSection("CategoriserLuceneParams").Get<CategoriserLuceneParams>();
-
-            //params for update staging queue.
-            //UpdateStagingQueueParams updateStagingQueueParams = config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>();
-            //services.AddSingleton<UpdateStagingQueueParams>(updateStagingQueueParams);
-
-            AmazonSqsStagingQueueParams awsSqsParams = config.GetSection("AmazonSqsParams").Get<AmazonSqsStagingQueueParams>();
-            services.AddSingleton<AmazonSqsStagingQueueParams>(awsSqsParams);
+            LuceneHelperTools.ConfigureLuceneServices(categoriserLuceneParams, services);
 
             // IAIDs connection info
             services.AddTransient<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) =>
@@ -137,8 +128,6 @@ namespace NationalArchives.Taxonomy.Batch
                 IConnectOpenSearch<OpenSearchRecordAssetView> recordAssetsOpenSearchConnection = new OpenSearchConnection<OpenSearchRecordAssetView>(discoveryOpenSearchConnParams);
                 return recordAssetsOpenSearchConnection;
             });
-
-
 
             // IAView repo i.e. to fetch IAIDs for indexing, using category connection info.
             services.AddTransient<IIAViewRepository>((ctx) =>
@@ -201,46 +190,42 @@ namespace NationalArchives.Taxonomy.Batch
                 return categoriserRepo; 
             });
 
+            //########################################################################
 
-            //TODO: Remove - replaced with IUpdateStagingQueueSender
-            //Staging queue for updates.  Needs to be a singleton or we get multiple consumers!
-            //services.AddSingleton<IUpdateStagingQueue>((ctx) =>
-            //{
-            //    UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
-            //    return new ActiveMqDirectUpdateStagingQueue(qParams);
-            //});
-
-
+            UpdateStagingQueueParams updateStagingQueueParams = config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>();
+            services.AddSingleton<UpdateStagingQueueParams>(updateStagingQueueParams);
 
             if (_operationMode == OperationMode.Full_Reindex)
             {
+                services.AddSingleton(typeof(ILogger<IUpdateStagingQueueSender>), typeof(Logger<AmazonSqsUpdateSender>));
+
                 services.AddSingleton<IUpdateStagingQueueSender>((ctx) =>
                 {
                     var logger = ctx.GetRequiredService<ILogger<IUpdateStagingQueueSender>>();
-                    //UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
-                    //return new ActiveMqUpdateSender(qParams, logger);
-                    AmazonSqsStagingQueueParams qParams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
-                    return new AmazonSqsUpdateSender(qParams, logger);
-                }); 
-            }
-            else
-            {
-                services.AddSingleton<IUpdateStagingQueueSender>((ctx) =>
-                {
-                    //UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
-                    //return new ActiveMqDirectUpdateSender(qParams);
-                    AmazonSqsStagingQueueParams qParams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
-                    var logger = ctx.GetRequiredService<ILogger<IUpdateStagingQueueSender>>();
-                    return new AmazonSqsDirectUpdateSender(qParams, logger);
+                    UpdateStagingQueueParams qParams = ctx.GetRequiredService<UpdateStagingQueueParams>();
+                    return new AmazonSqsUpdateSender(updateStagingQueueParams, logger);
                 });
             }
+
+            if (_operationMode == OperationMode.Daily_Update)
+            {
+                services.AddSingleton(typeof(ILogger<IUpdateStagingQueueSender>), typeof(Logger<AmazonSqsDirectUpdateSender>));
+
+                services.AddSingleton<IUpdateStagingQueueSender>((ctx) =>
+                {
+                    var logger = ctx.GetRequiredService<ILogger<IUpdateStagingQueueSender>>();
+                    return new AmazonSqsDirectUpdateSender(updateStagingQueueParams, logger);
+                });
+            }
+            //########################################################################
 
             services.AddTransient<ICategoriserService<CategorisationResult>>((ctx) =>
             {
                 ICategoryRepository categeoryRepo = ctx.GetRequiredService<ICategoryRepository>(); // source repo for list of categories.
-                    IIAViewRepository iaViewRepository = ctx.GetRequiredService<IIAViewRepository>();  // source repo for information assets.
-                    ICategoriserRepository categoriserRepo = ctx.GetRequiredService<ICategoriserRepository>();
-                    IUpdateStagingQueueSender stagingQueueSender = ctx.GetRequiredService<IUpdateStagingQueueSender>();
+                IIAViewRepository iaViewRepository = ctx.GetRequiredService<IIAViewRepository>();  // source repo for information assets.
+                ICategoriserRepository categoriserRepo = ctx.GetRequiredService<ICategoriserRepository>();
+                IUpdateStagingQueueSender stagingQueueSender = ctx.GetRequiredService<IUpdateStagingQueueSender>();
+                
                 return new QueryBasedCategoriserService(iaViewRepository, categeoryRepo, categoriserRepo, stagingQueueSender);
             });
 
@@ -251,49 +236,80 @@ namespace NationalArchives.Taxonomy.Batch
             });
 
 
+            if (_operationMode == OperationMode.Full_Reindex)
+            {
+                FullReindexQueueParams fullIndexQParams = config.GetSection("FullReindexQueueParams").Get<FullReindexQueueParams>();
+
+                FullReindexIaidProducerSource iaidSource = (FullReindexIaidProducerSource)Enum.Parse(typeof(FullReindexIaidProducerSource), fullIndexQParams.IaidSource);
+                services.AddSingleton<FullReindexQueueParams>(fullIndexQParams);
+
+
+                services.AddSingleton<FullReIndexIaidPcQueue<string>>((ctx) =>
+                {
+                    FullReindexQueueParams qparams = ctx.GetRequiredService<FullReindexQueueParams>();
+                    return new FullReIndexIaidPcQueue<string>(qparams.MaxSize);
+                }); // =>  FullReindexService
+
+                var openSearchAssetBrowseParams = config.GetSection("OpenSearchAssetFetchParams").Get<OpenSearchAssetBrowseParams>();
+
+                if (iaidSource == FullReindexIaidProducerSource.OpenSearch)
+                {
+                    services.AddSingleton<IIAIDProducer>((ctx) =>
+                    {
+                        var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
+                        var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
+                        var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
+
+                        return new FullReindexOpenSearchIaidProducer(reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
+                    }); 
+                }
+                else
+                {
+                    services.AddSingleton<IIAIDProducer>((ctx) =>
+                    {
+                        var qparams = ctx.GetRequiredService<FullReindexQueueParams>();
+                        var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
+                        var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
+                        var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
+
+                        return new FullReindexSqsQueueIaidProducer(qparams,reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
+                    });
+                }
+
+                services.AddSingleton(typeof(ILogger<FullReindexService>), typeof(Logger<FullReindexService>));
+                services.AddHostedService<FullReindexService>();
+            }
+
+
             if (_operationMode == OperationMode.Daily_Update)
             {
-                MessageQueueParams dailyUpdatemessageQueueParams = config.GetSection("DailyUpdateMessageQueueParams").Get<MessageQueueParams>();
+                DailyUpdateQueueParams dailyUpdatemessageQueueParams = config.GetSection("DailyUpdateQueueParams").Get<DailyUpdateQueueParams>();
+                services.AddSingleton<DailyUpdateQueueParams>(dailyUpdatemessageQueueParams);
+
+                services.AddSingleton(typeof(ILogger<DailyUpdatesManagerService>), typeof(Logger<DailyUpdatesManagerService>));
+
+                services.AddSingleton(typeof(ILogger<CategoriseDocAmazonSqsConsumer>), typeof(Logger<CategoriseDocAmazonSqsConsumer>));
+                services.AddSingleton(typeof(ILogger<DeleteDocAmazonSqsMessageConsumer>), typeof(Logger<DeleteDocAmazonSqsMessageConsumer>));
+
+                
 
                 services.AddSingleton<ISourceIaidInputQueueConsumer>((ctx) =>
                 {
+                    DailyUpdateQueueParams dailyUpdatemessageQueueParams = ctx.GetRequiredService<DailyUpdateQueueParams>();
                     ICategoriserService<CategorisationResult> categoriserService = ctx.GetRequiredService<ICategoriserService<CategorisationResult>>();
-                    ILogger<CategoriseDocActiveMqConsumer> categoriseConsumerLogger = ctx.GetRequiredService<ILogger<CategoriseDocActiveMqConsumer>>();
-                    return new CategoriseDocActiveMqConsumer(categoriserService, dailyUpdatemessageQueueParams, categoriseConsumerLogger);
+                    ILogger<CategoriseDocAmazonSqsConsumer> categoriseConsumerLogger = ctx.GetRequiredService<ILogger<CategoriseDocAmazonSqsConsumer>>();
+                    return new CategoriseDocAmazonSqsConsumer(categoriserService, dailyUpdatemessageQueueParams, categoriseConsumerLogger);
                 });
 
-                services.AddSingleton<DeleteDocActiveMqConsumer>((ctx) =>
+                services.AddSingleton<DeleteDocAmazonSqsMessageConsumer>((ctx) =>
                 {
-                    ILogger<DeleteDocActiveMqConsumer> dailyDeleteLogger = ctx.GetRequiredService<ILogger<DeleteDocActiveMqConsumer>>();
-                    return new DeleteDocActiveMqConsumer(dailyUpdatemessageQueueParams, dailyDeleteLogger);
+                    AmazonSqsParams dailyUpdatemessageQueueParams = ctx.GetRequiredService<AmazonSqsParams>();
+                    ILogger<DeleteDocAmazonSqsMessageConsumer> dailyDeleteLogger = ctx.GetRequiredService<ILogger<DeleteDocAmazonSqsMessageConsumer>>();
+                    return new DeleteDocAmazonSqsMessageConsumer(dailyUpdatemessageQueueParams, dailyDeleteLogger);
                 });
 
                 services.AddHostedService<DailyUpdatesManagerService>();
             }
-
-            if(_operationMode == OperationMode.Full_Reindex)
-            {
-               services.AddSingleton<FullReIndexIaidPcQueue<string>>((ctx) =>
-               {
-                   var qparams = ctx.GetRequiredService<AmazonSqsStagingQueueParams>();
-                   return new FullReIndexIaidPcQueue<string>(qparams.MaxSize);
-               }); // =>  FullReindexService
-
-                var openSearchAssetBrowseParams = config.GetSection("OpenSearchAssetFetchParams").Get<OpenSearchAssetBrowseParams>();
-
-                services.AddSingleton<FullReindexIaidProducer>((ctx) =>
-                {
-                    var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
-                    var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
-                    var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
-
-                    return new FullReindexIaidProducer(reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
-                });
-                    
-                services.AddHostedService<FullReindexService>();
-            }
-
-            LuceneHelperTools.ConfigureLuceneServices(categoriserLuceneParams, services);
 
             ServiceProvider provider = services.BuildServiceProvider(); 
         }

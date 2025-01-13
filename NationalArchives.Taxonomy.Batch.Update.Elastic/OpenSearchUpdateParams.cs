@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NationalArchives.Taxonomy.Common.Domain.Queue;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,6 +7,8 @@ namespace NationalArchives.Taxonomy.Batch
 {
     internal sealed class OpenSearchUpdateParams
     {
+        public AmazonSqsParams AmazonSqsParams { get; set; }
+
         public int  BulkUpdateBatchSize { get; set; }
 
         public int QueueFetchSleepTime { get; set; }

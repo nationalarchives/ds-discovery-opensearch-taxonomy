@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Text;
 
 namespace NationalArchives.Taxonomy.Common.BusinessObjects
@@ -38,6 +39,37 @@ namespace NationalArchives.Taxonomy.Common.BusinessObjects
             }
 
             return sb.ToString().TrimEnd(new char[] { ',', ' ' });
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+
+                hash = hash * 23 + _iaid.GetHashCode();
+                foreach (string s in _categoryIds)
+                {
+                    hash = hash * 23 + s.GetHashCode(); 
+                }
+
+                return hash;
+            }
+        }
+
+        public override bool Equals(object other)
+        {
+            IaidWithCategories otherIaidWithCategories = other as IaidWithCategories;
+
+            if (otherIaidWithCategories == null || otherIaidWithCategories.Iaid != this.Iaid || otherIaidWithCategories.CategoryIds.Count != this.CategoryIds.Count) 
+            { return false; }
+
+            foreach (string s in this.CategoryIds) 
+            {
+                if (!otherIaidWithCategories.CategoryIds.Contains(s)) { return false; }
+            }
+
+            return true;
         }
     }
 }

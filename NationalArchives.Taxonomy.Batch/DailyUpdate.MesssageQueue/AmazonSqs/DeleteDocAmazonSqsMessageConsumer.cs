@@ -1,30 +1,33 @@
 ﻿using Microsoft.Extensions.Logging;
 using NationalArchives.Taxonomy.Batch.Utils;
 using NationalArchives.Taxonomy.Common;
+using NationalArchives.Taxonomy.Common.BusinessObjects;
+using NationalArchives.Taxonomy.Common.Domain.Queue;
+using NationalArchives.Taxonomy.Common.Service;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Batch.DailyUpdate.MessageQueue
 {
-    internal class DeleteDocActiveMqConsumer : ActiveMqConsumerBase
+    internal class DeleteDocAmazonSqsMessageConsumer : AmazonSqsConsumerBase
     {
         //public DeleteDocActiveMqConsumer(MessageQueueParams msgQueueParams, ILogger<ActiveMqConsumerBase> logger) : base(msgQueueParams.BrokerUri, msgQueueParams.DeleteQueueName, logger)
         //{
         //}
 
-        public DeleteDocActiveMqConsumer(MessageQueueParams msgQueueParams, ILogger<ActiveMqConsumerBase> logger) : base(msgQueueParams, msgQueueParams.DeleteQueueName, logger)
+        public DeleteDocAmazonSqsMessageConsumer(AmazonSqsParams queueParams, ILogger<DeleteDocAmazonSqsMessageConsumer> logger) : base(queueParams, logger)
         {
         }
 
-        protected override void HandleTextMessage(string messageId, string message)
+        protected override async Task HandleTextMessage(IList<string> listOfIaids)
         {
-            IList<string> iaidsInMessage = message.GetListOfDocReferencesFromMessage();
 
-            string summaryMessage = $"received Delete Document message: {messageId}, docReferences: {iaidsInMessage}, total = {iaidsInMessage.Count}";
+            string summaryMessage = $"received Delete Document message from daily update queue, docReferences: {listOfIaids}, total = {listOfIaids.Count}";
             _logger.LogInformation(summaryMessage);
             Console.WriteLine(summaryMessage);
 
-            TaxonomyDocumentMessageHolder deleteDocumentMessage = new TaxonomyDocumentMessageHolder(messageId, iaidsInMessage);
+            TaxonomyDocumentMessageHolder deleteDocumentMessage = new TaxonomyDocumentMessageHolder(listOfIaids);
 
             foreach (string iaid in deleteDocumentMessage.ListOfDocReferences)
             {
@@ -48,12 +51,12 @@ namespace NationalArchives.Taxonomy.Batch.DailyUpdate.MessageQueue
 
             if (deleteDocumentMessage.HasProcessingErrors)
             {
-                _logger.LogWarning($"completed treatment for message: {deleteDocumentMessage.MessageId} with {deleteDocumentMessage.ListOfDocReferencesInError} errors");
+                _logger.LogWarning($"completed treatment for message from daily update queue with {deleteDocumentMessage.ListOfDocReferencesInError} errors");
                 _logger.LogError($"DOCREFERENCES that raise an issue while deleting: {deleteDocumentMessage.ListOfDocReferencesInError}");
             }
             else
             {
-                _logger.LogInformation($"completed treatment for message: {messageId}. {deleteDocumentMessage.ListOfDocReferences.Count} information assets processed.");
+                _logger.LogInformation($"completed treatment for message from daily update queue. {deleteDocumentMessage.ListOfDocReferences.Count} information assets processed.");
             }
         }
 

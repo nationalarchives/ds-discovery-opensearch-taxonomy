@@ -2,8 +2,6 @@
 using Amazon.Runtime;
 using Amazon.SQS;
 using Amazon.SQS.Model;
-using Apache.NMS;
-using Apache.NMS.ActiveMQ;
 using Microsoft.Extensions.Logging;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using Newtonsoft.Json;
@@ -19,12 +17,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
     public class AmazonSqsUpdateSender : IUpdateStagingQueueSender, IDisposable
     {
         private const string ROLE_SESSION_NAME = "Taxonomy_SQS_Update_FULL_REINDEX";
-
-        private readonly ConnectionFactory _activeMqConnectionFactory;
-        private readonly IConnection _activeMqConnection;
-        private readonly ISession _activeMqSession;
-        private readonly IDestination _activeMqdestination;
-        private readonly IMessageProducer _activeMqProducer;
 
         private BlockingCollection<IaidWithCategories> _blockingCollection = new BlockingCollection<IaidWithCategories>();
         private CancellationToken _token = default;
@@ -47,32 +39,34 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         private ThreadLocal<int> _workerResultCount = new ThreadLocal<int>();
         private ThreadLocal<int> _workerMessageCount = new ThreadLocal<int>();
 
-        private readonly AmazonSqsStagingQueueParams _qParams;
+        private readonly AmazonSqsParams _sqsParams;
+        private readonly int _sendIntervalMS;
 
         private bool _initialised;
 
-        public AmazonSqsUpdateSender(AmazonSqsStagingQueueParams qParams, ILogger<IUpdateStagingQueueSender> logger)
+        public AmazonSqsUpdateSender(UpdateStagingQueueParams updateStagingQueueParams, ILogger<IUpdateStagingQueueSender> logger)
         {
             try
             {
-                if (qParams == null || String.IsNullOrEmpty(qParams.QueueUrl))
+                if (updateStagingQueueParams == null || String.IsNullOrEmpty(updateStagingQueueParams.AmazonSqsParams.QueueUrl))
                 {
                     throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, "Invalid or missing queue parameters for Amazon SQS");
                 }
 
-                _qParams = qParams;
-                _workerCount = Math.Max(qParams.WorkerCount, 1);
-                _maxSendErrors = qParams.MaxErrors;
-                _batchSize = Math.Max(qParams.BatchSize, 1);
+                _sqsParams = updateStagingQueueParams.AmazonSqsParams;
+                _workerCount = Math.Max(updateStagingQueueParams.WorkerCount, 1);
+                _maxSendErrors = updateStagingQueueParams.MaxErrors;
+                _batchSize = Math.Max(updateStagingQueueParams.BatchSize, 1);
 
                 _logger = logger;
-                _verboseLoggingEnabled = qParams.EnableVerboseLogging;
+                _verboseLoggingEnabled = updateStagingQueueParams.EnableVerboseLogging;
+                _sendIntervalMS = updateStagingQueueParams.SendIntervalMilliseconds;
             }
             catch (Exception e)
             {
-                Dispose();
-                throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, $"Error establishing a connection to Amazon SQS {qParams.QueueUrl}", e);
+                throw ;
             }
+            // finally { Dispose(); }
         }
 
         public async Task<bool> Init(CancellationToken token, Action<int, int> updateQueueProgress)
@@ -186,7 +180,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 {
                     if (!_tcs.Task.IsFaulted) //Only one worker should set this as calling repeatedly causes an exception
                     {
-                        _tcs.TrySetException(new TaxonomyException(TaxonomyErrorType.JMS_EXCEPTION, "The Active MQ update error count has been exceeded.")); 
+                        _tcs.TrySetException(new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, "The SQS update error count has been exceeded.")); 
                     }
                     CompleteAdding();
                     break;
@@ -210,49 +204,23 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 {
                     try
                     {
-                        AmazonSQSClient client;
-                        RegionEndpoint region = RegionEndpoint.GetBySystemName(_qParams.Region);
-
-                        if (!_qParams.UseIntegratedSecurity)
-                        {
-                            AWSCredentials credentials = null;
-
-                            if (!String.IsNullOrEmpty(_qParams.SessionToken))
-                            {
-                                credentials = new SessionAWSCredentials(awsAccessKeyId: _qParams.AccessKey, awsSecretAccessKey: _qParams.SecretKey, _qParams.SessionToken); 
-                            }
-                            else
-                            {
-                                credentials = new BasicAWSCredentials(accessKey: _qParams.AccessKey, secretKey: _qParams.SecretKey); 
-                            }
-                            
-
-                            AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, _qParams.RoleArn, ROLE_SESSION_NAME);
-
-                            client = new AmazonSQSClient(aWSAssumeRoleCredentials, region); 
-                        }
-                        else
-                        {
-                            client = new AmazonSQSClient(region);
-                        }
+                        RegionEndpoint region = RegionEndpoint.GetBySystemName(_sqsParams.Region);
+                        AWSCredentials credentials = _sqsParams.GetCredentials(ROLE_SESSION_NAME);
 
                         var request = new SendMessageRequest()
                         {
                             MessageBody = JsonConvert.SerializeObject(currentBatch),
-                            QueueUrl = _qParams.QueueUrl,
+                            QueueUrl = _sqsParams.QueueUrl,
                         };
 
-                        //try
-                        //{
-
+                        using AmazonSQSClient client = new AmazonSQSClient(credentials, region);
                         SendMessageResponse result =  client.SendMessageAsync(request).Result;
-                        //}
-                        //catch (Exception)
-                        //{
 
-                        //    throw;
-                        //}
-                        //Console.WriteLine(result);
+                        if (_sendIntervalMS > 0)
+                        {
+                            await Task.Delay(_sendIntervalMS); 
+                        }
+
                     }
                     catch (Exception ex)
                     {
@@ -287,17 +255,14 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
             }
 
-            _blockingCollection.Dispose();
-            _activeMqProducer?.Dispose();
-            _activeMqSession?.Dispose();
-            _activeMqConnection?.Dispose();
-
+            _blockingCollection?.Dispose();
         }
 
         private bool IsComplete()
         {
             try
             {
+
                 bool isComplete = _blockingCollection.IsCompleted;
                 return isComplete;
             }

@@ -3,7 +3,6 @@ using Amazon.Runtime;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Logging;
-using NationalArchives.Taxonomy.Common.BusinessObjects;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -13,66 +12,44 @@ using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Queue
 {
-    public class AmazonSqsUpdateReceiver : IUpdateStagingQueueReceiver, IDisposable
+    public class AmazonSqsReceiver<T> : IUpdateStagingQueueReceiver<T>, IDisposable
     {
         private const int FETCH_RETRY_COUNT = 5;
         private const string ROLE_SESSION_NAME = "Taxonomy_SQS_Update";
 
-        private readonly AmazonSqsStagingQueueParams _qParams;    
+        private readonly AmazonSqsParams _qParams;    
 
-        private AmazonSQSClient _client;
+        private readonly AmazonSQSClient _client;
 
-        public AmazonSqsUpdateReceiver(AmazonSqsStagingQueueParams qParams)
+        public AmazonSqsReceiver(AmazonSqsParams sqsParams)
         {
 
-            if(qParams == null || String.IsNullOrEmpty(qParams.QueueUrl))
+            if(sqsParams == null || String.IsNullOrEmpty(sqsParams.QueueUrl))
             {
                 throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, "Invalid or missing queue parameters for Amazon SQS");
             }
 
-            _qParams = qParams;
+            _qParams = sqsParams;
 
             try
             {
-                RegionEndpoint region = RegionEndpoint.GetBySystemName(qParams.Region);
-
-                if (!qParams.UseIntegratedSecurity)
-                {
-                    AWSCredentials credentials = null;
-
-                    if (!String.IsNullOrEmpty(qParams.SessionToken))
-                    {
-                        credentials = new SessionAWSCredentials(awsAccessKeyId: qParams.AccessKey, awsSecretAccessKey: qParams.SecretKey, qParams.SessionToken);
-                    }
-                    else
-                    {
-                        credentials = new BasicAWSCredentials(accessKey: qParams.AccessKey, secretKey: qParams.SecretKey);
-                    }
-
-                    AWSCredentials aWSAssumeRoleCredentials = new AssumeRoleAWSCredentials(credentials, qParams.RoleArn, ROLE_SESSION_NAME);
-
-                    _client = new AmazonSQSClient(aWSAssumeRoleCredentials, region);
-                }
-                else
-                {
-                    _client = new AmazonSQSClient(region);
-                }
-
+                RegionEndpoint region = RegionEndpoint.GetBySystemName(sqsParams.Region);
+                AWSCredentials credentials = sqsParams.GetCredentials(ROLE_SESSION_NAME);
+                _client = new AmazonSQSClient(credentials, region);
             }
             catch (Exception e)
             {
                 Dispose();
-                throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, $"Error establishing a connection to Amazon SQS {qParams.QueueUrl}.", e);
+                throw new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, $"Error establishing a connection to Amazon SQS {sqsParams.QueueUrl}.", e);
             }
         }
 
-        public async Task<List<IaidWithCategories>> GetNextBatchOfResults(Microsoft.Extensions.Logging.ILogger logger, int sqsRequestTimeoutSeconds)
+        public async Task<List<T>> GetNextBatchOfResults(Microsoft.Extensions.Logging.ILogger logger, int sqsRequestTimeoutMilliSeconds)
         {
-            List<IaidWithCategories> results = new List<IaidWithCategories>();
+            List<T> results = new List<T>();
             List<DeleteMessageBatchRequestEntry> msgHandlesForDelete = new List<DeleteMessageBatchRequestEntry>();
 
-            CancellationTokenSource fetchCancelSource = new CancellationTokenSource(TimeSpan.FromSeconds(sqsRequestTimeoutSeconds));
-
+            CancellationTokenSource fetchCancelSource = new CancellationTokenSource(sqsRequestTimeoutMilliSeconds);
 
             // Try long polling first. But sometimes this times out and brings back no results, even with the max 20 seconds wait time.
             // Therefore we have Short polling as a fallback.  This generally brings back fewer results, sometimes as few as 1 or 5 in testing.
@@ -81,7 +58,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
                 QueueUrl = _qParams.QueueUrl,
                 MaxNumberOfMessages = 10,
-                WaitTimeSeconds = TimeSpan.FromSeconds(Math.Min(sqsRequestTimeoutSeconds, 20)).Seconds  // 20 sconds the max for ReceiveMessageRequest but may want to use more for Cancel Token
+                WaitTimeSeconds = TimeSpan.FromSeconds(Math.Min(sqsRequestTimeoutMilliSeconds, 20000)).Seconds  // 20 seconds is the max for ReceiveMessageRequest but may want to use more for Cancel Token
             };
 
             var shortPollingRequestParams = new ReceiveMessageRequest
@@ -111,7 +88,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 {
                     foreach (Message msg in message?.Messages)
                     {
-                        List<IaidWithCategories> result = JsonConvert.DeserializeObject<List<IaidWithCategories>>(msg.Body);
+                        List<T> result = JsonConvert.DeserializeObject<List<T>>(msg.Body);
                         results.AddRange(result);
                         msgHandlesForDelete.Add(new DeleteMessageBatchRequestEntry() { Id = msg.MessageId, ReceiptHandle = msg.ReceiptHandle });
                     }
@@ -132,20 +109,22 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
                     try
                     {
-                        CancellationTokenSource deleteCancelSource = new CancellationTokenSource(TimeSpan.FromSeconds(sqsRequestTimeoutSeconds));
+                        CancellationTokenSource deleteCancelSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(sqsRequestTimeoutMilliSeconds));
                         await _client.DeleteMessageBatchAsync(deleteRequest, deleteCancelSource.Token);
                     }
-                    catch (TaskCanceledException tcex)
+                    catch (TaskCanceledException)
                     {
-                        logger.LogWarning($"Request for taxonomy categorisation results from SQS queue {_qParams.QueueUrl} succeeded.  However the subsequent delete request for the message timed out after waiting {sqsRequestTimeoutSeconds} seconds");
+                        TimeSpan ts = TimeSpan.FromMilliseconds(sqsRequestTimeoutMilliSeconds);
+                        logger.LogWarning($"Request for taxonomy categorisation results from SQS queue {_qParams.QueueUrl} succeeded.  However the subsequent delete request for the message timed out after waiting {ts.TotalSeconds} seconds.");
                     } 
                 }
 
                 return results;
             }
-            catch(TaskCanceledException tcex)
+            catch(TaskCanceledException)
             {
-                logger.LogError($"Request for taxonomy categorisation results from SQS queue {_qParams.QueueUrl} timed out after waiting {sqsRequestTimeoutSeconds} seconds");
+                TimeSpan ts = TimeSpan.FromMilliseconds(sqsRequestTimeoutMilliSeconds);
+                logger.LogError($"Request for taxonomy categorisation results from SQS queue {_qParams.QueueUrl} timed out after waiting for {ts.TotalSeconds} seconds.");
                 return results;
             }
             catch (Exception ex)
