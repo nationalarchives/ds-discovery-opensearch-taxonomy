@@ -50,6 +50,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
         {
             try
             {
+                //TODO: Unlike the database cursor based fetch, There is no way here as yet to filter out non-TNA records, if the input queue includes these.
                 _totalCount += iaids.Count;
                 // Add the first batch of results to the queue.
                 AddToQueue(iaids);
