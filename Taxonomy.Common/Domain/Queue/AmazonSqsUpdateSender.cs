@@ -61,6 +61,9 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 _logger = logger;
                 _verboseLoggingEnabled = updateStagingQueueParams.EnableVerboseLogging;
                 _sendIntervalMS = updateStagingQueueParams.SendIntervalMilliseconds;
+
+                string queureUrl = _sqsParams.QueueUrl;
+                _logger.LogInformation("Instantiating AmazonSqsUpdateSender for queue {queureUrl} with a submission batch size of {_batchSize} and a worked count of {_workerCount}", queureUrl, _batchSize, _workerCount);
             }
             catch (Exception e)
             {
@@ -75,6 +78,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
                 return false;
             }
+
+            _logger.LogInformation("AmazonSqsUpdateSender: Initialising internal queue processing and submission of updates to SQS results queue {_sqsParams.QueueUrl}.", _sqsParams.QueueUrl);
 
             _token = token;
             _updateQueueProgress = updateQueueProgress;
@@ -131,6 +136,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         {
             try
             {
+                _logger.LogInformation(" AmazonSqsUpdateSender: calling CompleteAdding on internal queue.");
                 _blockingCollection.CompleteAdding();
             }
             catch (ObjectDisposedException)
@@ -174,10 +180,18 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         private async Task Consume1()
         {
 
-            while (!IsComplete() && !_token.IsCancellationRequested)
+            while (!_token.IsCancellationRequested)
             {
+                if (IsComplete())
+                {
+                    _logger.LogInformation("AmazonSqsUpdateSender : breaking out of Consume1 as IsComplete");
+                    break;
+                }
+
+
                 if (_sendErrors.Count >= _maxSendErrors)
                 {
+                    _logger.LogError("AmazonSqsUpdateSender: Processing terminating as error count exceeded.");
                     if (!_tcs.Task.IsFaulted) //Only one worker should set this as calling repeatedly causes an exception
                     {
                         _tcs.TrySetException(new TaxonomyException(TaxonomyErrorType.SQS_EXCEPTION, "The SQS update error count has been exceeded.")); 
@@ -196,7 +210,13 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
                     if(gotResult)
                     {
+                        
                         currentBatch.Add(nextResult);
+                        //_logger.LogInformation("AmazonSqsUpdateSender : Retrieved a categorisation result from internal blocking collection.  Current working batch size is { currentBatch.Count}", currentBatch.Count);
+                    }
+                    else
+                    {
+                       // _logger.LogInformation("AmazonSqsUpdateSender : TryTake returned false from blockling collection.  Current working batch size is { currentBatch.Count}", currentBatch.Count);
                     }
                 }
 
@@ -204,6 +224,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 {
                     try
                     {
+                        _logger.LogInformation("Retrieved a batch of {currentBatch.Count} from the internal queue.  Sending to SQS queue {_sqsParams.QueueUrl}", currentBatch.Count, _sqsParams.QueueUrl);
+
                         RegionEndpoint region = RegionEndpoint.GetBySystemName(_sqsParams.Region);
                         AWSCredentials credentials = _sqsParams.GetCredentials(ROLE_SESSION_NAME);
 
@@ -262,8 +284,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         {
             try
             {
+                bool isComplete = _blockingCollection.IsCompleted && _blockingCollection.Count == 0;
 
-                bool isComplete = _blockingCollection.IsCompleted;
+                if (isComplete)
+                    _logger.LogInformation("AmazonSqsUpdateSender queue marked as complete.");
+
                 return isComplete;
             }
             catch (Exception)

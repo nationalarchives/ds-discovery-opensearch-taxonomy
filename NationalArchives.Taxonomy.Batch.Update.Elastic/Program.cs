@@ -74,12 +74,13 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch
         {
             IConfiguration config = context.Configuration;
 
-            var openSearchUpdateParams = config.GetSection(nameof(OpenSearchUpdateParams)).Get<OpenSearchUpdateParams>();
+            //var openSearchUpdateParams = config.GetSection("DiscoveryOpenSearchParams").Get<OpenSearchUpdateParams>();
 
-            //var stagingQueueParams = config.GetSection(nameof(UpdateStagingQueueParams)).Get<UpdateStagingQueueParams>();
-            var stagingQueueSqsParams = config.GetSection("AmazonSqsParams").Get<AmazonSqsParams>();
+            //var stagingQueueSqsParams = config.GetSection("UpdateStagingQueueParams").Get<AmazonSqsParams>();
 
-            var updateOpenSearchConnParams = config.GetSection(nameof(UpdateOpenSearchConnectionParameters)).Get<UpdateOpenSearchConnectionParameters>();
+            DiscoveryOpenSearchConnectionParameters discoveryOpenSearchConnParams = config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>();
+            UpdateStagingQueueParams updateStagingQueueParams = config.GetSection("UpdateStagingQueueParams").Get<UpdateStagingQueueParams>();
+            OpenSearchUpdateParams upDateParams = config.GetSection("OpenSearchUpdateParams").Get<OpenSearchUpdateParams>();
 
             services.AddSingleton(typeof(ILogger<UpdateOpenSearchWindowsService>), typeof(Logger<UpdateOpenSearchWindowsService>));
             services.AddSingleton(typeof(ILogger<UpdateOpenSearchService>), typeof(Logger<UpdateOpenSearchService>));
@@ -87,21 +88,23 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch
             //Staging queue for updates.  Needs to be a singleton or we get multiple consumers!
             services.AddSingleton<IUpdateStagingQueueReceiver<IaidWithCategories>>((ctx) =>
             {
-                return new AmazonSqsReceiver<IaidWithCategories>(stagingQueueSqsParams);
+                var qParams = updateStagingQueueParams.AmazonSqsParams;
+                //var qParams = ctx.GetRequiredService<UpdateStagingQueueParams>().AmazonSqsParams;
+                return new AmazonSqsReceiver<IaidWithCategories>(qParams);
             });
 
             services.AddTransient<IOpenSearchIAViewUpdateRepository, OpenSearchIAViewUpdateRepository>((ctx) =>
             {
-                return new OpenSearchIAViewUpdateRepository(updateOpenSearchConnParams);
+                return new OpenSearchIAViewUpdateRepository(discoveryOpenSearchConnParams);
             });
 
             services.AddSingleton<IUpdateOpenSearchService>((ctx) =>
             {
-                int bulkUpdateBatchSize = openSearchUpdateParams.BulkUpdateBatchSize;
-                int queueFetchSleepTime = openSearchUpdateParams.QueueFetchSleepTime;
-                int queueFetchWaitTime = stagingQueueSqsParams.WaitMilliseconds;
-                int searchDatabaseUpdateInterval = openSearchUpdateParams.SearchDatabaseUpdateInterval;
-                int maxInternalQueueSize = openSearchUpdateParams.MaxInternalQueueSize;
+                int bulkUpdateBatchSize = upDateParams.BulkUpdateBatchSize;
+                int queueFetchSleepTime = upDateParams.QueueFetchSleepTime;
+                int queueFetchWaitTime = upDateParams.WaitMilliseconds;
+                int searchDatabaseUpdateInterval = upDateParams.SearchDatabaseUpdateInterval;
+                int maxInternalQueueSize = upDateParams.MaxInternalQueueSize;
 
                 Console.WriteLine($"Using a batch size of {bulkUpdateBatchSize} and a queue fetch interval of {queueFetchSleepTime} sceonds for Open Search bulk updates.");
 

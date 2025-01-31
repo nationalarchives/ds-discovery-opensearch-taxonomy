@@ -38,6 +38,18 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
     public bool IsProcessingComplete { get => _isProcessingComplete; set => _isProcessingComplete = value; }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="updateQueue"></param>
+        /// <param name="targetOpenSearchRepository">OpenSearch repo</param>
+        /// <param name="logger">Logger</param>
+        /// <param name="batchSize">Batch size for sending results to OpenSearch via bulk update</param>
+        /// <param name="queueFetchWaitTimeMS">Time to wait for a response when requesting messages from the queue</param>
+        /// <param name="queueFetchSleepTimeMS">Time to wait after processing one set of results to query the queue for the next set</param>
+        /// <param name="searchDatabaseUpdateIntervalMS">Interval at which to check the internal queue for updates received from SQS and to submit them as a batch to OpenSearch</param>
+        /// <param name="maxInternalQueueSize"></param>
+        /// <exception cref="TaxonomyException"></exception>
         public UpdateOpenSearchService(IUpdateStagingQueueReceiver<IaidWithCategories> updateQueue, IOpenSearchIAViewUpdateRepository targetOpenSearchRepository, ILogger logger, 
             int batchSize, int queueFetchWaitTimeMS, int queueFetchSleepTimeMS, int searchDatabaseUpdateIntervalMS, int maxInternalQueueSize)
         {
