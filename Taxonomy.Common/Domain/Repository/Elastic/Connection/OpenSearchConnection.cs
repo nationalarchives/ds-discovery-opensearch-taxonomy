@@ -1,5 +1,6 @@
 ﻿using NationalArchives.Taxonomy.Common.BusinessObjects;
 using OpenSearch.Client;
+using OpenSearch.Net;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,9 +26,14 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
         public OpenSearchConnection(OpenSearchConnectionParameters openSearchConnectionParameters)
         {
             _parameters = openSearchConnectionParameters;
-            //ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, errors) => true;
+#if DEBUG
+            ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, errors) => true; 
+#endif
             using (ConnectionSettings connectionSettings = ConnectionSettingsProvider.GetConnectionSettings(_parameters))
             {
+#if DEBUG
+                connectionSettings.ServerCertificateValidationCallback((sender, cert, chain, errors) => true); 
+#endif
                 //connectionSettings.DisableAutomaticProxyDetection(true);
                 _openSearchClient = new OpenSearchClient(connectionSettings);
             }

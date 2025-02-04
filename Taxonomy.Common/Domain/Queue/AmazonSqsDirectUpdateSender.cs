@@ -74,6 +74,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 AWSCredentials credentials = _sqsParams.GetCredentials(ROLE_SESSION_NAME);
                 client = new AmazonSQSClient(credentials, region);
 
+                _logger.LogInformation("AmazonSqsDirectUpdateSender: Sending an update to the Taxonomy results queue for asset ID {item.Iaid}", item.Iaid);
+
                 var request = new SendMessageRequest()
                 {
                     MessageBody = JsonConvert.SerializeObject(itemAsList),

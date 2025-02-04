@@ -129,7 +129,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             catch(TaskCanceledException)
             {
                 TimeSpan ts = TimeSpan.FromMilliseconds(sqsRequestTimeoutMilliSeconds);
-                logger.LogError($"Request for taxonomy categorisation results from SQS queue {_qParams.QueueUrl} timed out after waiting for {ts.TotalSeconds} seconds.");
+                logger.LogWarning($"Request for taxonomy categorisation results from SQS queue {_qParams.QueueUrl} timed out after waiting for {ts.TotalSeconds} seconds.");
                 return results;
             }
             catch (Exception ex)

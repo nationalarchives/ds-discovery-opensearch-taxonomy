@@ -20,7 +20,9 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         public AmazonSqsConsumerBase(AmazonSqsParams queueParams, ILogger logger)
         {
-            _receiver = new AmazonSqsReceiver<string>(queueParams, new AmazonSqsStringMessageReader());
+            IAmazonSqsMessageReader<string> messageReader = new AmazonSqsJsonMessageReader<string>();
+
+            _receiver = new AmazonSqsReceiver<string>(queueParams, messageReader);
             _logger = logger;
             _waitMilliseconds = queueParams.WaitMilliseconds;
         }

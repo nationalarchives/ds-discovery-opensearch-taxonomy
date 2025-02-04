@@ -73,7 +73,7 @@ namespace NationalArchives.Taxonomy.Batch.DailyUpdate.MessageQueue
                         }
                         else
                         {
-                            _logger.LogInformation($"completed treatment for message from dauly update queue. {categoriseDocumentMessage.ListOfDocReferences.Count} information assets processed.");
+                            _logger.LogInformation($"completed treatment for message from daily update queue. {categoriseDocumentMessage.ListOfDocReferences.Count} information assets processed.");
                         }
                     }
                 }
