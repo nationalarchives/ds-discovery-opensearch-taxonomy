@@ -84,13 +84,14 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch
 
             services.AddSingleton(typeof(ILogger<UpdateOpenSearchWindowsService>), typeof(Logger<UpdateOpenSearchWindowsService>));
             services.AddSingleton(typeof(ILogger<UpdateOpenSearchService>), typeof(Logger<UpdateOpenSearchService>));
+            services.AddSingleton(typeof(IAmazonSqsMessageReader<IaidWithCategories>), typeof(AmazonSqsJsonMessageReader<IaidWithCategories>));
 
             //Staging queue for updates.  Needs to be a singleton or we get multiple consumers!
             services.AddSingleton<IUpdateStagingQueueReceiver<IaidWithCategories>>((ctx) =>
             {
                 var qParams = updateStagingQueueParams.AmazonSqsParams;
-                //var qParams = ctx.GetRequiredService<UpdateStagingQueueParams>().AmazonSqsParams;
-                return new AmazonSqsReceiver<IaidWithCategories>(qParams);
+                var messageReader = ctx.GetRequiredService<IAmazonSqsMessageReader<IaidWithCategories>>();
+                return new AmazonSqsReceiver<IaidWithCategories>(qParams, messageReader);
             });
 
             services.AddTransient<IOpenSearchIAViewUpdateRepository, OpenSearchIAViewUpdateRepository>((ctx) =>

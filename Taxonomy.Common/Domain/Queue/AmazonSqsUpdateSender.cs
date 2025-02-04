@@ -29,7 +29,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         private TaskCompletionSource<bool> _tcs; 
 
-        private volatile int _resultsSent;
+        private volatile int _resultsSent = 0;
 
         Action<int, int> _updateQueueProgress;
 
@@ -225,6 +225,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                     try
                     {
                         _logger.LogInformation("Retrieved a batch of {currentBatch.Count} from the internal queue.  Sending to SQS queue {_sqsParams.QueueUrl}", currentBatch.Count, _sqsParams.QueueUrl);
+                        _logger.LogInformation("There are currently {_blockingCollection.Count} results on the internal queue awaiting submission to SQS, {_resultsSent} results have been sent to the queue.", _blockingCollection.Count, _resultsSent);
 
                         RegionEndpoint region = RegionEndpoint.GetBySystemName(_sqsParams.Region);
                         AWSCredentials credentials = _sqsParams.GetCredentials(ROLE_SESSION_NAME);
@@ -237,6 +238,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
                         using AmazonSQSClient client = new AmazonSQSClient(credentials, region);
                         SendMessageResponse result =  client.SendMessageAsync(request).Result;
+                        _resultsSent += currentBatch.Count;
+
 
                         if (_sendIntervalMS > 0)
                         {

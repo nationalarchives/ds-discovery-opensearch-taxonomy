@@ -20,8 +20,9 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
         private readonly AmazonSqsParams _qParams;    
 
         private readonly AmazonSQSClient _client;
+        private readonly IAmazonSqsMessageReader<T> _messageReader;
 
-        public AmazonSqsReceiver(AmazonSqsParams sqsParams)
+        public AmazonSqsReceiver(AmazonSqsParams sqsParams, IAmazonSqsMessageReader<T> messageReader)
         {
 
             if(sqsParams == null || String.IsNullOrEmpty(sqsParams.QueueUrl))
@@ -30,6 +31,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             }
 
             _qParams = sqsParams;
+            _messageReader = messageReader;
 
             try
             {
@@ -88,8 +90,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 {
                     foreach (Message msg in message?.Messages)
                     {
-                        List<T> result = JsonConvert.DeserializeObject<List<T>>(msg.Body);
-                        results.AddRange(result);
+                        IList<T> messageResult = _messageReader.ReadMessage(msg.Body);
+                        //char[] delimiterChars = { ' ', ',', '.', ':', '\t' };
+                        //string[] result = msg.Body.Split(delimiterChars);
+                        //List<T> result = JsonConvert.DeserializeObject<List<T>>(msg.Body);
+                        results.AddRange(messageResult);
                         msgHandlesForDelete.Add(new DeleteMessageBatchRequestEntry() { Id = msg.MessageId, ReceiptHandle = msg.ReceiptHandle });
                     }
                 }
