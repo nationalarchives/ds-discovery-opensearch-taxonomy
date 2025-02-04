@@ -60,7 +60,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
                 QueueUrl = _qParams.QueueUrl,
                 MaxNumberOfMessages = 10,
-                WaitTimeSeconds = TimeSpan.FromSeconds(Math.Min(sqsRequestTimeoutMilliSeconds, 20000)).Seconds  // 20 seconds is the max for ReceiveMessageRequest but may want to use more for Cancel Token
+                WaitTimeSeconds = TimeSpan.FromMilliseconds(Math.Min(sqsRequestTimeoutMilliSeconds, 20000)).Seconds  // 20 seconds is the max for ReceiveMessageRequest but may want to use more for Cancel Token
             };
 
             var shortPollingRequestParams = new ReceiveMessageRequest

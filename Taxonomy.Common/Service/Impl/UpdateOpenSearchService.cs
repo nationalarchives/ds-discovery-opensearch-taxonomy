@@ -143,7 +143,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                         } while (_internalQueue.Count > (_maxInternalQueueSize / 2));
 
                         _logger.LogInformation($"Internal queue size is now {_internalQueue.Count}.  Resuming fetch of taxonomy results from SQS.");
-                        nextBatchOfResults = await _interimUpdateQueue.GetNextBatchOfResults(_logger, sqsRequestTimeoutMilliSeconds: Math.Min(_queueFetchWaitTimeMS, 20));
+                        nextBatchOfResults = await _interimUpdateQueue.GetNextBatchOfResults(_logger, sqsRequestTimeoutMilliSeconds: Math.Min(_queueFetchWaitTimeMS, 20000));
                     }
 
                     if (nextBatchOfResults != null)
