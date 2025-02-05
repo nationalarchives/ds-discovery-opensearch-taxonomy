@@ -45,5 +45,5 @@ Taxonomy_FullReindexQueueParams__AmazonSqsParams__UseIntegratedSecurity
 
 Taxonomy_CategoryMongoParams__ConnectionString
 
-Values for the stahing environment are in Parameter Store at:
+Values for the staging environment are in Parameter Store at:
 https://eu-west-2.console.aws.amazon.com/systems-manager/parameters/%252Fapplication%252Fopensearch%252Ftaxonomy%252Fenvironmant_variables/description?region=eu-west-2&tab=Table#list_parameter_filters=Name:Contains:taxonomy
