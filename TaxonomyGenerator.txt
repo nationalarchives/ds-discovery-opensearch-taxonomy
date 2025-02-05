@@ -1,0 +1,41 @@
+# Windows Service
+PS C:\Users\Administrator> $serviceDir = "C:\Misc\Taxonomy\TaxonomyGenerator"
+PS C:\Users\Administrator> $serviceName = "TaxonomyGenerator"
+PS C:\Users\Administrator> $serviceDisplayName = "Taxonomy Generator"
+PS C:\Users\Administrator> $serviceDescription = "Taxonomy Generatorr"
+PS C:\Users\Administrator> $serviceExe = Join-Path -Path $serviceDir -ChildPath  "NationalArchives.Taxonomy.Batch.exe"
+
+
+#If using a dedeicated service account. N.B. this also requires some Registry changes to enable the account to write to the event log  - see documentation
+PS C:\Users\Administrator> $serviceAccountName = "s-appTaxonomy"
+PS C:\Users\Administrator> $hostName = $env:computername
+PS C:\Users\Administrator> $serviceAccount = Join-Path -Path $hostName -ChildPath $ServiceAccountName
+PS C:\Users\Administrator> $acl = Get-Acl $serviceDir
+PS C:\Users\Administrator> $aclRuleArgs = $serviceAccount, "Read,Write,ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow"
+PS C:\Users\Administrator> $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($aclRuleArgs)
+PS C:\Users\Administrator> $acl | Set-Acl $serviceDir
+
+# If using Local System:
+$serviceAccount = "NT AUTHORITY\LOCAL SYSTEM"
+
+
+PS C:\Users\Administrator> New-Service -Name $serviceName -BinaryPathName $serviceExe -Credential $serviceAccount -Description $serviceDescription -DisplayName $serviceDisplayName -StartupType Automatic
+
+
+# Event Log
+New-EventLog -LogName Application -Source "Taxonomy Generator"
+New-EventLog -LogName Application -Source "NationalArchives.Taxonomy.Batch"
+
+N.B. It is possible to have two installations on the same machine, for  FullIndex and Daily Updates.  If so, adjust the location names as appropriate, e.g.
+
+PS C:\Users\Administrator> $serviceDir = "C:\Misc\Taxonomy\TaxonomyGeneratorFullReindex"
+PS C:\Users\Administrator> $serviceName = "TaxonomyGeneratorFullReindex"
+PS C:\Users\Administrator> $serviceDisplayName = "Taxonomy Generator (Full Reindex)"
+PS C:\Users\Administrator> $serviceDescription = "Taxonomy Generator  (Full Reindex)"
+
+and
+
+PS C:\Users\Administrator> $serviceDir = "C:\Misc\Taxonomy\TaxonomyGeneratorDailyUpdate"
+PS C:\Users\Administrator> $serviceName = "TaxonomyGeneratorDailyUpdate"
+PS C:\Users\Administrator> $serviceDisplayName = "Taxonomy Generator (Daily Update)"
+PS C:\Users\Administrator> $serviceDescription = "Taxonomy Generator  (Daily Update)"

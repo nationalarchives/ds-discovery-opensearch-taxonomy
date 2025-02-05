@@ -1,0 +1,21 @@
+$serviceDir = "C:\Misc\Taxonomy\TaxonomyOpenSearchUpdate" 
+$serviceName = "TaxonomyOpenSearchUpdate"
+$serviceDisplayName = "Taxonomy Open Search Update"
+$serviceDescription = "Taxonomy Open Search Update"
+$serviceExe = Join-Path -Path $serviceDir -ChildPath  "NationalArchives.Taxonomy.Batch.Update.OpenSearch.exe"
+
+#If using a dedeicated service account. N.B. this also requires some Registry changes to enable the account to write to the event log  - see documentation
+PS C:\Users\Administrator> $serviceAccountName = "s-appTaxonomy"
+PS C:\Users\Administrator> $hostName = $env:computername
+PS C:\Users\Administrator> $serviceAccount = Join-Path -Path $hostName -ChildPath $ServiceAccountName
+PS C:\Users\Administrator> $acl = Get-Acl $serviceDir
+PS C:\Users\Administrator> $aclRuleArgs = $serviceAccount, "Read,Write,ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow"
+PS C:\Users\Administrator> $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($aclRuleArgs)
+PS C:\Users\Administrator> $acl | Set-Acl $serviceDir
+
+# If using Local System:
+$serviceAccountName = "NT AUTHORITY\LOCAL SYSTEM"
+
+New-Service -Name $serviceName -BinaryPathName $serviceExe -Credential $serviceAccount -Description $serviceDescription -DisplayName $serviceDisplayName -StartupType Automatic	
+
+New-EventLog -LogName Application -Source "Taxonomy Open Search Update"
