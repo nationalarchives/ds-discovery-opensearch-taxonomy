@@ -1,4 +1,4 @@
-# Discovery taxonomy updater for Opensearch
+# Discovery Taxonomy for Opensearch
 
 ## Prerequisite
 
