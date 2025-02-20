@@ -2,8 +2,6 @@
 using Amazon.Runtime;
 using Amazon.SQS;
 using Amazon.SQS.Model;
-using Apache.NMS;
-using Apache.NMS.ActiveMQ;
 using Microsoft.Extensions.Logging;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using Newtonsoft.Json;

@@ -2,7 +2,7 @@
 PS C:\Users\Administrator> $serviceDir = "C:\Misc\Taxonomy\TaxonomyGenerator"
 PS C:\Users\Administrator> $serviceName = "TaxonomyGenerator"
 PS C:\Users\Administrator> $serviceDisplayName = "Taxonomy Generator"
-PS C:\Users\Administrator> $serviceDescription = "Taxonomy Generatorr"
+PS C:\Users\Administrator> $serviceDescription = "Taxonomy Generator"
 PS C:\Users\Administrator> $serviceExe = Join-Path -Path $serviceDir -ChildPath  "NationalArchives.Taxonomy.Batch.exe"
 
 
