@@ -29,7 +29,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NationalArchives.Taxonomy.C
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documentation", "Documentation", "{289A70F9-9A27-47FE-AA56-3C546368726B}"
 	ProjectSection(SolutionItems) = preProject
-		..\..\..\temp\Taxonomy\TAXONOMY Documentation1_4.docx = ..\..\..\temp\Taxonomy\TAXONOMY Documentation1_4.docx
+		Y:\boreilly\Taxonomy\TAXONOMY Documentation1_5.docx = Y:\boreilly\Taxonomy\TAXONOMY Documentation1_5.docx
 		..\..\..\temp\Taxonomy\Visio Diagram of Bulk Update Process.jpg = ..\..\..\temp\Taxonomy\Visio Diagram of Bulk Update Process.jpg
 		..\..\..\temp\Taxonomy\Visio Diagram of Bulk Update Process.pdf = ..\..\..\temp\Taxonomy\Visio Diagram of Bulk Update Process.pdf
 		..\..\..\temp\Taxonomy\Visio Diagram of Bulk Update Process.vsdx = ..\..\..\temp\Taxonomy\Visio Diagram of Bulk Update Process.vsdx
