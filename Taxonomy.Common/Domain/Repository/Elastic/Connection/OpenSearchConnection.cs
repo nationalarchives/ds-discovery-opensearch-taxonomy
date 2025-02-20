@@ -116,7 +116,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
         public async Task<IGetResponse<T>> GetAsync(string id)
         {
             IGetResponse<T> getResponse = await _openSearchClient.GetAsync<T>(id);
-            RaiseExceptionIfResponseIsInvalid(getResponse);
+            RaiseExceptionIfResponseIsInvalid(getResponse, id);
             return getResponse;
         }
 
@@ -332,8 +332,20 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             return facets;
         }
 
-        private void RaiseExceptionIfResponseIsInvalid(IResponse response)
+        private void RaiseExceptionIfResponseIsInvalid(IResponse response, string assetId = null)
         {
+            if(response.ApiCall.HttpStatusCode == 404)
+            {
+                if (!String.IsNullOrEmpty(assetId))
+                {
+                    throw new TaxonomyException(TaxonomyErrorType.DOC_NOT_FOUND, $"Could not find asset id {assetId} in the Open Search database."); 
+                }
+                else
+                {
+                    throw new TaxonomyException(TaxonomyErrorType.DOC_NOT_FOUND, $"The Open Search database returned a 404 Not Found response.");
+                }
+            }
+
             if (!response.IsValid)
             {
                 throw new WebException($@"{response.ServerError}
