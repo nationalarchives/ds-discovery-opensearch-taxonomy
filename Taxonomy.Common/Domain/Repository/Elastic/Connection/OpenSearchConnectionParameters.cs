@@ -54,10 +54,21 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 
     public sealed class OpenSearchAwsParams 
     {
+        [Obsolete]
         public bool UseAwsConnection { get; set; }
+        public OpenSearchConnectionMode OpenSearchConnectionMode { get; set; }
         public string AccessKey { get; set; }
         public string SecretKey { get; set; }
         public string Region { get; set; }
         public string RoleArn { get; set; }
+        public string SessionToken { get; set; }
+    }
+
+    public enum OpenSearchConnectionMode
+    {
+        Agnostic,
+        AwsBasic,
+        EC2,
+        None
     }
 }
