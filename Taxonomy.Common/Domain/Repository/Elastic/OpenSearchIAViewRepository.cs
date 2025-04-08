@@ -79,7 +79,12 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
                 {
                     OpenSearchRecordAssetView searchResult = result.Source;
                     var infoAsset = _mapper.Map<InformationAssetView>(searchResult);
-                    informationAssets.Add(infoAsset);
+
+                    // Possibly the previous lack of null check was leading to the object ref error at InMemoryCategoriserRepository.cs:line 370
+                    if (infoAsset != null)
+                    {
+                        informationAssets.Add(infoAsset); 
+                    }
                 }
 
                 return informationAssets;

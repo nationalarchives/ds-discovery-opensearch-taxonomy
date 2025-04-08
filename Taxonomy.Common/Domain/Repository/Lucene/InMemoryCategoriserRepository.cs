@@ -367,11 +367,14 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
             {
                 try
                 {
-                    if (String.IsNullOrWhiteSpace(iaView.DocReference))
+                    if (String.IsNullOrWhiteSpace(iaView?.DocReference))
                     {
                         _logger?.LogError($"Error in FindRelevantCategoriesForDocuments - null or missing IAID reference in document retrieved from Elastic Search.");
                     }
-                    categorisationResults.Add(iaView.DocReference, new List<CategorisationResult>());
+                    else
+                    {
+                        categorisationResults.Add(iaView.DocReference, new List<CategorisationResult>()); 
+                    }
                 }
                 catch (ArgumentException aex)
                 {
@@ -382,7 +385,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
             lns.SearcherManager searcherManager = null;   // org.apache.lucene.search;
             lns.IndexSearcher searcher = null;   //org.apache.lucene.store;
 
-            ln.Store.Directory luceneDirectory = CreateRamDirectoryForDocuments(iaViews);  //org.apache.lucene.store;
+            ln.Store.Directory luceneDirectory = CreateRamDirectoryForDocuments(iaViews.Where(a => a != null).ToArray());  //org.apache.lucene.store;
 
             searcherManager = new lns.SearcherManager(luceneDirectory, null);   //org.apache.lucene.search;
             searcher = searcherManager.Acquire(); //org.apache.lucene.store;
