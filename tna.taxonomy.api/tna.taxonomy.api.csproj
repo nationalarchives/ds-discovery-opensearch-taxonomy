@@ -19,4 +19,10 @@
     <ProjectReference Include="..\Taxonomy.Common\NationalArchives.Taxonomy.Common.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Update="appsettings.json">
+      <TransformOnBuild>true</TransformOnBuild>
+    </Content>
+  </ItemGroup>
+
 </Project>
