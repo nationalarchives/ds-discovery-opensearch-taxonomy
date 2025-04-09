@@ -27,12 +27,13 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
         {
             _parameters = openSearchConnectionParameters;
 #if DEBUG
-            ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, errors) => true; 
+            ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, errors) => true;
 #endif
             using (ConnectionSettings connectionSettings = ConnectionSettingsProvider.GetConnectionSettings(_parameters))
             {
 #if DEBUG
-                connectionSettings.ServerCertificateValidationCallback((sender, cert, chain, errors) => true); 
+                connectionSettings.ServerCertificateValidationCallback((sender, cert, chain, errors) => true);
+               
 #endif
                 //connectionSettings.DisableAutomaticProxyDetection(true);
                 _openSearchClient = new OpenSearchClient(connectionSettings);
@@ -66,7 +67,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             {
                 Query = SetupSearchRequest(searchParams),
                 Aggregations = SetupFacets(searchParams.FacetFields),
-                Sort = SetSortOrder(searchParams.Sort)
+                Sort = SetSortOrder(searchParams.Sort),
+                TrackTotalHits = true
             };
 
             var searchResponse =  _openSearchClient.Search<T>(_searchRequest);
@@ -86,7 +88,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
                 Source = searchParams.IncludeSource,
                 Scroll = searchParams.Scroll,
                 Size = searchParams.PageSize,
-                From = searchParams.PagingOffset
+                From = searchParams.PagingOffset,
+                TrackTotalHits = true
             };
 
             if(searchParams.PageSize != null)
@@ -167,7 +170,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
         public IList<CategorisationResult> CategoryMultiSearch(QueryBase baseOrIdsQuery, IList<Category> sourceCategories, bool useInMemoryIndex, bool includeScores, int maxConcurrentQueries)
         {
             // TODO: May want to throw exception if document not found in index.  But can't just do so if no categories match
-            // as this may be a legitimate outcome.  Possibly add additional get query just to get the coument and throw exception
+            // as this may be a legitimate outcome.  Possibly add additional get query just to get the document and throw exception
             // if no result.
             string indexToUse = useInMemoryIndex ? _inMemoryIndexName : _parameters.IndexDatabase;
             IOpenSearchClient targetOpenSearchClient = useInMemoryIndex  ? _openSearchClientInMemory : _openSearchClient;
