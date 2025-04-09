@@ -6,9 +6,9 @@ using NationalArchives.Taxonomy.Common.BusinessObjects;
 
 namespace tna.taxonomy.api.Controllers
 {
-    [Route("api/[controller]")]
+    [Produces("application/json")]
     [ApiController]
-    public class TaxonomyController : ControllerBase
+    public class TaxonomyController : Controller
     {
         private readonly IInformationAssetViewService _iaViewService;
         private readonly ICategoriserService<CategorisationResult> _categoriserService;

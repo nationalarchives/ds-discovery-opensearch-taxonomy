@@ -12,14 +12,11 @@ using NationalArchives.Taxonomy.Common.Service;
 var builder = WebApplication.CreateBuilder(args);
 
 var config = builder.Configuration;
-config.AddEnvironmentVariables("TAXONOMY_");
-config.AddUserSecrets<Program>();
 
 // Add services to the container.
 builder.Services.AddAutoMapper(mc => mc.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }));
 
 builder.Services.AddSingleton(config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>());
-builder.Services.AddSingleton(config.GetSection("CategoryOpenSearchParams").Get<CategoryDataOpenSearchConnectionParameters>());
 builder.Services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
 
 builder.Services.AddScoped<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) =>
@@ -29,7 +26,7 @@ builder.Services.AddScoped<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) 
     return recordAssetsElasticConnection;
 });
 
- CategorySource categorySource = (CategorySource)Enum.Parse(typeof(CategorySource), config.GetValue<string>("CategorySource"));
+CategorySource categorySource = (CategorySource)Enum.Parse(typeof(CategorySource), config.GetValue<string>("CategorySource"));
 // Get the categories form either Mongo or Elastic
 switch (categorySource)
 {
@@ -117,10 +114,14 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "taxonomy api", Version = "v1" });
 });
 
+builder.Services.AddHealthChecks();
+
 var app = builder.Build();
 
 var loggerFactory = app.Services.GetService<ILoggerFactory>();
- loggerFactory.AddFile(config["Logging:LogFilePath"].ToString());
+
+app.UsePathBase(new PathString("/taxonomyapi"));
+app.MapHealthChecks("/taxonomyapi/healthz");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -131,6 +132,6 @@ if (app.Environment.IsDevelopment())
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseRouting();
+//app.UseRouting();
 app.MapControllers();
 app.Run();

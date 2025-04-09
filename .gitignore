@@ -264,7 +264,6 @@ __pycache__/
 Logs/
 aws-logger-errors.txt
 /.dockerignore
-/Dockerfile
 /Dockerfile_web
 /Dockerfile_api
 /run
