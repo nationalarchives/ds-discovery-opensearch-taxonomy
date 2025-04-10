@@ -102,14 +102,20 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
             }
             finally
             {
-                _semaphore.Release();
+                _semaphore?.Release();
             }
 
         }
 
+        public async Task<IList<Category>> FindCategories(string searchText)
+        {
+            return m_MongoCollection.Find(c => c.Title.ToLower().Contains(searchText.ToLower()) && c.CIAID != null).SortBy(x => x.Title).ToList()
+                .Select(y => new Category() { Id = y.CIAID, Title = y.Title, Query = y.QueryText, Score = y.SC, Lock =false }).ToList();
+        }
+
         public Category FindByCiaid(string ciaid)
         {
-            var filter = $"{{ CIAID: '{ciaid}'}}";
+            var filter = $"{{ TAXONOMY_ID: '{ciaid}'}}";
             var awaiter = m_MongoCollection.FindAsync<CategoryFromMongo>(filter).GetAwaiter();
             CategoryFromMongo mongoCategory = awaiter.GetResult().Single();
             Category category = _mapper.Map<Category>(mongoCategory);
@@ -118,7 +124,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
 
         public Category FindByTitle(string title)
         {
-            var filter = $"{{ ttl: '{title}'}}";
+            var filter = $"{{ TAXONOMY: '{title}'}}";
             var awaiter = m_MongoCollection.FindAsync<CategoryFromMongo>(filter).GetAwaiter();
             CategoryFromMongo mongoCategory = awaiter.GetResult().Single();
             Category category = _mapper.Map<Category>(mongoCategory);
@@ -127,7 +133,52 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
 
         public void Save(Category category)
         {
-            throw new NotImplementedException();
+            var categoryData = m_MongoCollection.Find(c => c.CIAID == category.Id).FirstOrDefault();
+
+            if (categoryData == null)
+            {
+                throw new CategoryNotFoundException();
+            }
+
+            categoryData.Title = category.Title;
+            categoryData.QueryText = category.Query;
+            categoryData.SC = category.Score;
+
+            m_MongoCollection.ReplaceOne(c => c.CIAID == category.Id, categoryData);
+        }
+
+        public Category AddNewCategory(string title, string query, double score = 0.0)
+        {
+            try
+            {
+                _semaphore.Wait();
+                // Check there isn't alaready a category with the same title.
+                var category = this.FindByTitle(title);
+
+                if (category != null)
+                {
+                    throw new CategoryAlreadyExistsException();
+                }
+
+                string fmt = "00000";
+                string lastId = this.FindAll().Result.OrderByDescending(category => category.Id).First().Id;
+                int latestNumber = Convert.ToInt32(lastId.Substring(1));
+                int nextNumber = ++latestNumber;
+                string nextId = "C" + nextNumber.ToString(fmt);
+
+                var newCategory = new CategoryFromMongo() { CIAID = nextId, Title = title, QueryText = query, SC = score };
+                m_MongoCollection.InsertOne(newCategory);
+
+                return _mapper.Map<Category>(newCategory);
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+            finally 
+            { 
+                _semaphore?.Release();
+            }
         }
 
         public void Dispose()

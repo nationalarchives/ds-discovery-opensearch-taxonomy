@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Driver;
+using NationalArchives.Taxonomy.Common;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
 
@@ -11,18 +13,48 @@ namespace tna.taxonomy.api.Controllers
     public class CategoriesController : ControllerBase
     {
         private readonly ICategoryRepository _categoryRepository;
+        private readonly ILogger<CategoriesController> _logger;
 
-        public CategoriesController(ICategoryRepository categoryRepository)
+        public CategoriesController(ICategoryRepository categoryRepository, ILogger<CategoriesController> logger)
         {
             _categoryRepository = categoryRepository;
+            _logger = logger;
         }
 
+        [Route("GetCategories")]
+        [HttpGet]
         public async Task<ActionResult<IList<Category>>> GetCategories()
         {
-            var categories = _categoryRepository.FindAll();
-            return Ok(categories);
+            try
+            {
+                IList<Category> categories =  await _categoryRepository.FindAll(); 
+                return Ok(categories);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving list of categories.");
+                return StatusCode(500);
+            }
         }
 
+        [Route("Search")]
+        [HttpGet]
+        public async Task<ActionResult<IList<Category>>> Search(string searchText)
+        {
+            try
+            {
+                IList<Category> categories = await _categoryRepository.FindCategories(searchText);
+                return Ok(categories);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving list of categories.");
+                return StatusCode(500);
+            }
+        }
+
+        [Route("GetCategoryById")]
+        [HttpGet]
         public async Task<ActionResult<Category>> GetCategoryById(string categoryId)
         {
             if (string.IsNullOrEmpty(categoryId) || !categoryId.StartsWith("C", StringComparison.InvariantCultureIgnoreCase))
@@ -30,21 +62,79 @@ namespace tna.taxonomy.api.Controllers
                 return BadRequest();
             }
 
-            var category = _categoryRepository.FindByCiaid(categoryId);
+            try
+            {
+                var category = _categoryRepository.FindByCiaid(categoryId);
 
-            if (category != null)
-            {
-                return Ok(category);
+                if (category != null)
+                {
+                    return Ok(category);
+                }
+                else
+                {
+                    return NotFound();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                return NotFound();
+                _logger.LogError(ex, $"Error retrieving category with id {categoryId}");
+                return StatusCode(500);
             }
         }
 
-        public async Task<ActionResult> AddCategory(string title, string definition)
+        [Route("AddNewCategory")]
+        [HttpPost]
+        public async Task<ActionResult<Category>> AddCategory(string title, string query, double score, bool catLock)
         {
-            throw new NotImplementedException();
+            if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(query))
+            {
+                return BadRequest();
+            }
+
+            try
+            {
+                var category = _categoryRepository.AddNewCategory(title, query, score);
+
+                if (category != null)
+                {
+                    return Ok(category);
+                }
+                else
+                {
+                    return StatusCode(500);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating category with title {title}, query definition {query}");
+                return StatusCode(500);
+            }
         }
-    }
+
+        [Route("SaveCategory")]
+        [HttpPost]
+        public async Task<ActionResult> SaveCategory(string categoryId, string title, string query, double score, bool catLock)
+        {
+            if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(query))
+            {
+                return BadRequest();
+            }
+
+            try
+            {
+                var category = new Category() { Title = title, Query = query, Score = score, Lock = catLock };
+                _categoryRepository.Save(category);
+                return NoContent();
+            }
+            catch (CategoryNotFoundException)
+            {
+                return NotFound(categoryId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating category {categoryId}");
+                return StatusCode(500);
+            }
+        }
+    } 
 }

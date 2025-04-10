@@ -39,5 +39,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Common
          * @param category
          */
         void Save(Category category);
+        Category AddNewCategory(string title, string query, double score = 0);
+        Task<IList<Category>> FindCategories(string searchText);
     }
 }
