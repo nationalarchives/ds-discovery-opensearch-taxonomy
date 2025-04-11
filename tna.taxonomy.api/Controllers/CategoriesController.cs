@@ -1,9 +1,12 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Lucene.Net.Util;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using NationalArchives.Taxonomy.Common;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
+using SharpCompress;
+
 
 namespace tna.taxonomy.api.Controllers
 {
@@ -27,7 +30,8 @@ namespace tna.taxonomy.api.Controllers
         {
             try
             {
-                IList<Category> categories =  await _categoryRepository.FindAll(); 
+                IList<Category> categories =  await _categoryRepository.FindAll();
+                categories.Sort((c1, c2) => c1.Title.CompareTo(c2.Title));
                 return Ok(categories);
             }
             catch (Exception ex)
@@ -113,26 +117,26 @@ namespace tna.taxonomy.api.Controllers
 
         [Route("SaveCategory")]
         [HttpPost]
-        public async Task<ActionResult> SaveCategory(string categoryId, string title, string query, double score, bool catLock)
+        public async Task<ActionResult> SaveCategory(Category category)
         {
-            if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(query))
+            if (category == null || string.IsNullOrEmpty(category.Title) || string.IsNullOrEmpty(category.Query))
             {
                 return BadRequest();
             }
 
             try
             {
-                var category = new Category() { Title = title, Query = query, Score = score, Lock = catLock };
+                //var category = new Category() { Title = title, Query = query, Score = score, Lock = catLock };
                 _categoryRepository.Save(category);
                 return NoContent();
             }
             catch (CategoryNotFoundException)
             {
-                return NotFound(categoryId);
+                return NotFound(category.Id);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error updating category {categoryId}");
+                _logger.LogError(ex, $"Error updating category {category.Id}");
                 return StatusCode(500);
             }
         }

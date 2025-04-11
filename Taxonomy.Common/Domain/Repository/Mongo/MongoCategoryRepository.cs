@@ -117,7 +117,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
         {
             var filter = $"{{ TAXONOMY_ID: '{ciaid}'}}";
             var awaiter = m_MongoCollection.FindAsync<CategoryFromMongo>(filter).GetAwaiter();
-            CategoryFromMongo mongoCategory = awaiter.GetResult().Single();
+            CategoryFromMongo mongoCategory = awaiter.GetResult().SingleOrDefault();
             Category category = _mapper.Map<Category>(mongoCategory);
             return category;
         }
