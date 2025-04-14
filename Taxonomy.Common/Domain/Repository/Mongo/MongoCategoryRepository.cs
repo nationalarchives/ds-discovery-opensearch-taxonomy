@@ -49,12 +49,12 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
             return _categories.Count;
         }
 
-        public async Task<IList<Category>> FindAll()
+        public async Task<IList<Category>> FindAll(bool forceRefresh = false)
         {
             await _semaphore.WaitAsync();
             try
             {
-                if (_categories != null)
+                if (_categories != null  && !forceRefresh)
                 {
                     return _categories;
                 }
@@ -86,7 +86,10 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
 
                     if (categories.Count > 0)
                     {
-                        _categories = categories;
+                        if (!forceRefresh)
+                        {
+                            _categories = categories; 
+                        }
                     }
                     else
                     {

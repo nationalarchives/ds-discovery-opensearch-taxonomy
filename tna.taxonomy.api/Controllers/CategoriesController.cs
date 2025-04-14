@@ -26,11 +26,11 @@ namespace tna.taxonomy.api.Controllers
 
         [Route("GetCategories")]
         [HttpGet]
-        public async Task<ActionResult<IList<Category>>> GetCategories()
+        public async Task<ActionResult<IList<Category>>> GetCategories(bool forceRefresh = false)
         {
             try
             {
-                IList<Category> categories =  await _categoryRepository.FindAll();
+                IList<Category> categories =  await _categoryRepository.FindAll(forceRefresh);
                 categories.Sort((c1, c2) => c1.Title.CompareTo(c2.Title));
                 return Ok(categories);
             }

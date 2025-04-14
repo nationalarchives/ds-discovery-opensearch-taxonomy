@@ -35,7 +35,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             return _categories.Count;
         }
 
-        public async Task<IList<Category>> FindAll()
+        public async Task<IList<Category>> FindAll(bool forceRefresh = false)
         {
             if(_categories != null)
             {

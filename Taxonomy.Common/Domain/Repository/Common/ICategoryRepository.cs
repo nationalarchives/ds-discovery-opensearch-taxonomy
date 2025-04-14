@@ -31,7 +31,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Common
          * 
          * @return
          */
-        Task<IList<Category>> FindAll();
+        Task<IList<Category>> FindAll(bool forceRefresh = false);
 
         /**
          * save new category
