@@ -52,4 +52,20 @@ namespace NationalArchives.Taxonomy.Common
             return builder.ToString();
         }
     }
+
+    public class CategoryNotFoundException : TaxonomyException 
+    {
+        public CategoryNotFoundException()
+        {
+            this.TaxonomyError = TaxonomyErrorType.CATEGORY_NOT_FOUND;
+        }
+    }
+
+    public class CategoryAlreadyExistsException : TaxonomyException
+    {
+        public CategoryAlreadyExistsException()
+        {
+            this.TaxonomyError = TaxonomyErrorType.CATEGORY_DUPLICATE_TITLE;
+        }
+    }
 }

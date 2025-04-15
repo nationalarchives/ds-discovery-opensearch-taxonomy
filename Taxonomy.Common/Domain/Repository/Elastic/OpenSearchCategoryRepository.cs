@@ -19,6 +19,12 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
         public OpenSearchCategoryRepository(IConnectOpenSearch<CategoryFromOpenSearch> openSearchConnection, IMapper mapper) : base(openSearchConnection, mapper)
         {
         }
+
+        public Category AddNewCategory(string title, string query, double score = 0)
+        {
+            throw new NotImplementedException();
+        }
+
         public long Count()
         {
             if(_categories == null)
@@ -29,7 +35,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             return _categories.Count;
         }
 
-        public async Task<IList<Category>> FindAll()
+        public async Task<IList<Category>> FindAll(bool forceRefresh = false)
         {
             if(_categories != null)
             {
@@ -99,6 +105,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             }
 
             return _categories.Single(c => String.Equals(c.Title, title, StringComparison.InvariantCultureIgnoreCase));
+        }
+
+        public Task<IList<Category>> FindCategories(string searchText)
+        {
+            throw new NotImplementedException();
         }
 
         public void Save(Category category)
