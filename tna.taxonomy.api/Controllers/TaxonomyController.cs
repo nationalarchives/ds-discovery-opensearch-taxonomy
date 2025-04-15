@@ -7,7 +7,7 @@ using NationalArchives.Taxonomy.Common.BusinessObjects;
 namespace tna.taxonomy.api.Controllers
 {
     [Produces("application/json")]
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     [ApiController]
     public class TaxonomyController : ControllerBase
     {

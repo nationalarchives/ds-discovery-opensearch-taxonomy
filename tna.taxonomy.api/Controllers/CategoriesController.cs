@@ -11,7 +11,7 @@ using SharpCompress;
 namespace tna.taxonomy.api.Controllers
 {
     [Produces("application/json")]
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     [ApiController]
     public class CategoriesController : ControllerBase
     {
