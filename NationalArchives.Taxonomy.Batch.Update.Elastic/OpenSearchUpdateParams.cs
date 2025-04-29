@@ -17,5 +17,7 @@ namespace NationalArchives.Taxonomy.Batch
 
         public int MaxInternalQueueSize { get; set; }
         public int WaitMilliseconds { get; set; }
+
+        public int NullCounterHours { get; set; }
     }
 }

@@ -23,10 +23,9 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
         private readonly int _queueFetchWaitTimeMS;
         private readonly int _searchDatabaseUpdateIntervalMS;
         private readonly int _maxInternalQueueSize;
+        private readonly int _nullCounterHoursThreshold;
         private readonly ILogger _logger;
 
-        //private const int NULL_COUNTER_THRESHOLD = 259200;  // 259200 seconds == 3 days.
-        private const int NULL_COUNTER_THRESHOLD = 72;  // Keep running for 3 days with 1 check per hour
         private const int MAX_SEARCH_DB_UPDATE_ERRORS = 5;
 
         bool _isProcessingComplete = false;
@@ -51,7 +50,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
         /// <param name="maxInternalQueueSize"></param>
         /// <exception cref="TaxonomyException"></exception>
         public UpdateOpenSearchService(IUpdateStagingQueueReceiver<IaidWithCategories> updateQueue, IOpenSearchIAViewUpdateRepository targetOpenSearchRepository, ILogger logger, 
-            int batchSize, int queueFetchWaitTimeMS, int queueFetchSleepTimeMS, int searchDatabaseUpdateIntervalMS, int maxInternalQueueSize)
+            int batchSize, int queueFetchWaitTimeMS, int queueFetchSleepTimeMS, int searchDatabaseUpdateIntervalMS, int maxInternalQueueSize, int nullCounterHours = 72)
         {
             if (updateQueue == null || targetOpenSearchRepository == null)
             {
@@ -65,6 +64,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             _queueFetchWaitTimeMS = queueFetchWaitTimeMS;
             _searchDatabaseUpdateIntervalMS = searchDatabaseUpdateIntervalMS;
             _maxInternalQueueSize = maxInternalQueueSize;
+            _nullCounterHoursThreshold = nullCounterHours;
             _logger = logger;
         }
 
@@ -165,16 +165,24 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                         {
                             nullCounter++;
 
-                            // If we didn;t get anything back, Wait an hour before trying again...
+                            // If we didn't get anything back, Wait an hour before trying again...
                             await Task.Delay(TimeSpan.FromHours(1));
 
-                            // this allows us to keep running for 3 days with no updates before shutting down the service, assuming a one hour wait between each check.
-                            if (nullCounter >= NULL_COUNTER_THRESHOLD)
+                            if (_nullCounterHoursThreshold > 0)
                             {
-                                IsProcessingComplete = true;
-                                await RetrieveAndSubmitUpdatesToOpenSearchDatabase();
-                                _cancelSource.Cancel();
-                                _logger.LogInformation("No more categorisation results found on update queue.  Open Search Update service will now finish processing.");
+                                // Log a warning message it no updates have been retrieved from the SQS queue for the configured number of hours.
+                                if (nullCounter >= _nullCounterHoursThreshold)
+                                {
+                                    int nullCounterDays = TimeSpan.FromHours(_nullCounterHoursThreshold).Days;
+                                    if (nullCounterDays > 0)
+                                    {
+                                        _logger.LogWarning("No categorisation results have been retrieved for {nullCounterDays} day(s).", nullCounterDays);
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning("No categorisation results have been retrieved for {_nullCounterHoursThreshold} hours.", _nullCounterHoursThreshold);
+                                    }
+                                } 
                             }
                         }
                     }
