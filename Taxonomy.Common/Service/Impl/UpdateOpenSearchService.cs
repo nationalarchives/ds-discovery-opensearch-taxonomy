@@ -31,7 +31,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
         bool _isProcessingComplete = false;
 
-        private volatile int _totalInfoAssetsUpdated;
+        private volatile int _totalInfoAssetsUpdatedInCurrentSession;
 
         private CancellationTokenSource _cancelSource = new CancellationTokenSource();
         private int _searchDatabaseUpdateErrors = 0;
@@ -158,6 +158,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                                     _internalQueue.Enqueue(categorisationResult);
                                 }
                             }
+                            nullCounter = 0;
                             await Task.Delay(_queueFetchSleepTimeMS);
                         }
                         else
@@ -206,7 +207,8 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                     {
                         Task delayTask = Task.Delay(interval, cancellationToken);
                         await RetrieveAndSubmitUpdatesToOpenSearchDatabase();
-                        
+                        _lastOpenSearchUpdateTime = DateTime.Now;
+
                         await delayTask;
 
                     }
@@ -219,9 +221,17 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                             if (minutesSinceLastUpdate % 5 == 0 && minutesSinceLastUpdate > minutesSinceLastNoUpdatesLogMessage)
                             {
                                 minutesSinceLastNoUpdatesLogMessage = minutesSinceLastUpdate;
-                                _logger.LogInformation($"No Taxonomy updates have been received by the Open Search" +
-                                    $" update service in the last {minutesSinceLastUpdate} minutes.  Resetting the update counter.");
-                                _totalInfoAssetsUpdated = 0;
+                                if (_totalInfoAssetsUpdatedInCurrentSession > 0)
+                                {
+                                    _logger.LogInformation($"No Taxonomy updates have been received by the Open Search" +
+                                     $" update service in the last {minutesSinceLastUpdate} minutes.  Resetting the update counter.");
+                                    _totalInfoAssetsUpdatedInCurrentSession = 0; 
+                                }
+                                else
+                                {
+                                    _logger.LogInformation($"No Taxonomy updates have been received by the Open Search" +
+                                     $" update service in the last {minutesSinceLastUpdate} minutes.");
+                                }
                             }
                         }
                     }
@@ -281,8 +291,8 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
                 int totalForThisBulkUpdateOperation = listOfIAViewUpdatesToProcess.Count;
                 _logger.LogInformation($"Completed bulk update in Open Search for {totalForThisBulkUpdateOperation} items: ");
-                _totalInfoAssetsUpdated += totalForThisBulkUpdateOperation;
-                _logger.LogInformation($" Category data for {_totalInfoAssetsUpdated} assets has now been added or updated in Open Search.");
+                _totalInfoAssetsUpdatedInCurrentSession += totalForThisBulkUpdateOperation;
+                _logger.LogInformation($" Category data for {_totalInfoAssetsUpdatedInCurrentSession} assets has now been added or updated in Open Search.");
                 _logger.LogInformation($" There are currently {_internalQueue.Count} results on the internal queue that have been retrieved from Amazon SQS and are awaiting submission to the database.");
             }
             catch (Exception ex)
@@ -298,7 +308,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                 _logger.LogInformation("Submitting single Asset update to Open Search: " + item.ToString());
                 await _targetOpenSearchRepository.Save(item);
                 _logger.LogInformation($"Completed single Asset in Open Search: {item.ToString()}." );
-                _totalInfoAssetsUpdated++;
+                _totalInfoAssetsUpdatedInCurrentSession++;
             }
             catch (Exception ex)
             {
