@@ -111,7 +111,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
             {
                 if (!_tcs.Task.IsFaulted)
                 {
-                    _tcs.SetException(ex); 
+                    _tcs.TrySetException(ex); 
                 }
                 return await _tcs.Task;
             }

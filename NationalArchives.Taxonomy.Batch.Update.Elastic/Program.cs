@@ -108,7 +108,7 @@ namespace NationalArchives.Taxonomy.Batch.Update.OpenSearch
                 int maxInternalQueueSize = upDateParams.MaxInternalQueueSize;
                 int nullCounterHours = upDateParams.NullCounterHours;
 
-                Console.WriteLine($"Using a batch size of {bulkUpdateBatchSize} and a queue fetch interval of {queueFetchSleepTime} sceonds for Open Search bulk updates.");
+                Console.WriteLine($"Using a batch size of {bulkUpdateBatchSize} and a queue fetch interval of {queueFetchSleepTime} seconds for Open Search bulk updates.");
 
                 IUpdateStagingQueueReceiver<IaidWithCategories> interimQueue = ctx.GetRequiredService<IUpdateStagingQueueReceiver<IaidWithCategories>>();  
                 IOpenSearchIAViewUpdateRepository updateRepo = ctx.GetRequiredService<IOpenSearchIAViewUpdateRepository>();

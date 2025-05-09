@@ -7,8 +7,6 @@ using NationalArchives.Taxonomy.Common.Domain.Queue;
 using NationalArchives.Taxonomy.Common.Service;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,6 +17,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
         private readonly FullReIndexIaidPcQueue<string> _pcQueue;
         private readonly IInformationAssetViewService _iaViewService;
         private readonly OpenSearchAssetBrowseParams _openSearchAssetBrowseParams;
+        private readonly string _sqsQueue;
 
         private volatile int _totalCount;
 
@@ -28,11 +27,15 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
             _pcQueue = pcQueue;
             _iaViewService = iaViewService;
             _openSearchAssetBrowseParams = openSearchAssetFetchParams;
+            _sqsQueue = qParams.AmazonSqsParams.QueueUrl;
         }
 
         public int TotalIdentifiersFetched => _totalCount;
 
         public int CurrentQueueSize => _pcQueue.Count;
+
+        public string Source => $"Sqs Queue: {_sqsQueue}";
+
         public async Task InitAsync(CancellationToken token)
         {
             try

@@ -298,7 +298,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
 
         private void OnStarted()
         {
-            _logger.LogInformation("Taxonomy Generator Full Reindex Service has started.");
+            _logger.LogInformation($"Taxonomy Generator Full Reindex Service has started.  Using input IAIDs from {_iaidsProducer.Source}");
 
         }
 

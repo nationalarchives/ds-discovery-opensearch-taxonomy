@@ -240,7 +240,7 @@ namespace NationalArchives.Taxonomy.Batch
             {
                 FullReindexQueueParams fullIndexQParams = config.GetSection("FullReindexQueueParams").Get<FullReindexQueueParams>();
 
-                FullReindexIaidProducerSource iaidSource = (FullReindexIaidProducerSource)Enum.Parse(typeof(FullReindexIaidProducerSource), fullIndexQParams.IaidSource);
+                FullReindexIaidProducerSource fullReindexIaidSource = (FullReindexIaidProducerSource)Enum.Parse(typeof(FullReindexIaidProducerSource), fullIndexQParams.IaidSource);
                 services.AddSingleton<FullReindexQueueParams>(fullIndexQParams);
 
 
@@ -252,28 +252,31 @@ namespace NationalArchives.Taxonomy.Batch
 
                 var openSearchAssetBrowseParams = config.GetSection("OpenSearchAssetFetchParams").Get<OpenSearchAssetBrowseParams>();
 
-                if (iaidSource == FullReindexIaidProducerSource.OpenSearch)
+                switch(fullReindexIaidSource)
                 {
-                    services.AddSingleton<IIAIDProducer>((ctx) =>
-                    {
-                        var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
-                        var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
-                        var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
+                    case FullReindexIaidProducerSource.OpenSearch:
+                        services.AddSingleton<IIAIDProducer>((ctx) =>
+                        {
+                            var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
+                            var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
+                            var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
 
-                        return new FullReindexOpenSearchIaidProducer(reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
-                    }); 
-                }
-                else
-                {
-                    services.AddSingleton<IIAIDProducer>((ctx) =>
-                    {
-                        var qparams = ctx.GetRequiredService<FullReindexQueueParams>();
-                        var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
-                        var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
-                        var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
+                            return new FullReindexOpenSearchIaidProducer(reindexQueue, iaViewService, openSearchAssetBrowseParams, logger, discoveryOpenSearchConnParams.Uri.AbsoluteUri);
+                        });
+                        break;
+                    case FullReindexIaidProducerSource.SqsQueue:
+                        services.AddSingleton<IIAIDProducer>((ctx) =>
+                        {
+                            var qparams = ctx.GetRequiredService<FullReindexQueueParams>();
+                            var iaViewService = ctx.GetRequiredService<IInformationAssetViewService>();
+                            var logger = ctx.GetRequiredService<ILogger<FullReindexService>>();
+                            var reindexQueue = ctx.GetRequiredService<FullReIndexIaidPcQueue<string>>();
 
-                        return new FullReindexSqsQueueIaidProducer(qparams,reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
-                    });
+                            return new FullReindexSqsQueueIaidProducer(qparams, reindexQueue, iaViewService, openSearchAssetBrowseParams, logger);
+                        });
+                        break;
+                    default:
+                        throw new Exception("Invalid Iaid Source for Fulll Reindex Operation");
                 }
 
                 services.AddSingleton(typeof(ILogger<FullReindexService>), typeof(Logger<FullReindexService>));

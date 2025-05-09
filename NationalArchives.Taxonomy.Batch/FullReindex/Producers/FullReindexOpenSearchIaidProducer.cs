@@ -26,14 +26,18 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
         internal EventHandler<MessageProcessingEventArgs> ProcessingCompleted;
         internal EventHandler<MessageProcessingEventArgs> FatalException;
 
+        private readonly string _openSearchUri;
+
         private volatile int _totalCount;
 
-        public FullReindexOpenSearchIaidProducer(FullReIndexIaidPcQueue<string> pcQueue, IInformationAssetViewService iaViewService, OpenSearchAssetBrowseParams openSearchAssetFetchParams,ILogger<FullReindexService> logger)
+        public FullReindexOpenSearchIaidProducer(FullReIndexIaidPcQueue<string> pcQueue, IInformationAssetViewService iaViewService, OpenSearchAssetBrowseParams openSearchAssetFetchParams,
+            ILogger<FullReindexService> logger, string openSearchUri = null)
         {
             _pcQueue = pcQueue;
             _iaViewService = iaViewService;
             _logger = logger;
             _openSearchAssetBrowseParams = openSearchAssetFetchParams;
+            _openSearchUri = openSearchUri;
         }
 
         public async Task InitAsync(CancellationToken token)
@@ -136,6 +140,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
                             }
                             while (!token.IsCancellationRequested && informationAssetsList.ScrollResults.Count > 0);
 
+                            _logger.LogInformation($"Calling CompleteAdding on OpenSource IAID input.  Cancellation requested is {token.IsCancellationRequested}, latest scroll results count is {informationAssetsList.ScrollResults.Count}");
                             _pcQueue.CompleteAdding();
                             // Takes c. 65 minutes to scroll through 10 million docs.
                             // And about 1 GB per 10 million IAID strings in memory.
@@ -158,7 +163,15 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
             }
             catch (Exception e)
             {
-                _logger.LogError(e.Message);
+                _logger.LogError(e, "Exception occurred in retrieving asset IDs for full re-index operation.");
+
+                Exception inner = e.InnerException;
+                while (inner != null) 
+                {
+                    _logger.LogError(inner, "Inner Exception:");
+                    inner = inner.InnerException;
+                }
+
                 throw;
             }
         }
@@ -183,5 +196,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
 
         public int TotalIdentifiersFetched { get => _totalCount; }
         public int CurrentQueueSize { get => _pcQueue.Count; }
+
+        public string Source => _openSearchUri ?? "OpenSearch";
     }
 }
