@@ -5,8 +5,6 @@ using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Lucene;
 using NationalArchives.Taxonomy.Common.Helpers;
 using OpenSearch.Client;
-
-//using Nest;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -216,10 +214,16 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
                 }
                 else  // existing scroll request
                 {
-                    var scrollResponse = _openSearchConnection.ScrollAsync(browseParams.PageSize, scrollId);
-                    if (scrollResponse.Result.Hits.Any())
+                    var scrollResponse = _openSearchConnection.ScrollAsync(browseParams.PageSize, scrollId).Result;
+
+                    if(!scrollResponse.IsValid)
                     {
-                        return new InformationAssetScrollList (scrollId, scrollResponse.Result.Hits.Select(h => h.Id).ToList());
+                        throw new Exception($"Scrolling failure retrieving results from Open Search", scrollResponse.OriginalException);
+                    }
+
+                    if (scrollResponse.Hits.Any())
+                    {
+                        return new InformationAssetScrollList (scrollId, scrollResponse.Hits.Select(h => h.Id).ToList());
                     }
                     else
                     {

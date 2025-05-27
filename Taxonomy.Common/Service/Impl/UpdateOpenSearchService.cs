@@ -8,6 +8,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,15 +24,14 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
         private readonly int _queueFetchWaitTimeMS;
         private readonly int _searchDatabaseUpdateIntervalMS;
         private readonly int _maxInternalQueueSize;
+        private readonly int _nullCounterHoursThreshold;
         private readonly ILogger _logger;
 
-        //private const int NULL_COUNTER_THRESHOLD = 259200;  // 259200 seconds == 3 days.
-        private const int NULL_COUNTER_THRESHOLD = 72;  // Keep running for 3 days with 1 check per hour
         private const int MAX_SEARCH_DB_UPDATE_ERRORS = 5;
 
         bool _isProcessingComplete = false;
 
-        private volatile int _totalInfoAssetsUpdated;
+        private volatile int _totalInfoAssetsUpdatedInCurrentSession;
 
         private CancellationTokenSource _cancelSource = new CancellationTokenSource();
         private int _searchDatabaseUpdateErrors = 0;
@@ -51,7 +51,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
         /// <param name="maxInternalQueueSize"></param>
         /// <exception cref="TaxonomyException"></exception>
         public UpdateOpenSearchService(IUpdateStagingQueueReceiver<IaidWithCategories> updateQueue, IOpenSearchIAViewUpdateRepository targetOpenSearchRepository, ILogger logger, 
-            int batchSize, int queueFetchWaitTimeMS, int queueFetchSleepTimeMS, int searchDatabaseUpdateIntervalMS, int maxInternalQueueSize)
+            int batchSize, int queueFetchWaitTimeMS, int queueFetchSleepTimeMS, int searchDatabaseUpdateIntervalMS, int maxInternalQueueSize, int nullCounterHours = 72)
         {
             if (updateQueue == null || targetOpenSearchRepository == null)
             {
@@ -65,6 +65,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
             _queueFetchWaitTimeMS = queueFetchWaitTimeMS;
             _searchDatabaseUpdateIntervalMS = searchDatabaseUpdateIntervalMS;
             _maxInternalQueueSize = maxInternalQueueSize;
+            _nullCounterHoursThreshold = nullCounterHours;
             _logger = logger;
         }
 
@@ -109,7 +110,7 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
         private async Task StartProcessing(CancellationToken token)
         {
-            int nullCounter = 0;
+            int nullCounterHours = 0;
 
             try
             {
@@ -158,23 +159,24 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                                     _internalQueue.Enqueue(categorisationResult);
                                 }
                             }
+                            nullCounterHours = 0;
                             await Task.Delay(_queueFetchSleepTimeMS);
                         }
                         else
                         {
-                            nullCounter++;
-
-                            // If we didn;t get anything back, Wait an hour before trying again...
-                            await Task.Delay(TimeSpan.FromHours(1));
-
-                            // this allows us to keep running for 3 days with no updates before shutting down the service, assuming a one hour wait between each check.
-                            if (nullCounter >= NULL_COUNTER_THRESHOLD)
+                            // Log a warning message if no updates have been retrieved from the SQS queue for the configured number of hours.
+                            if (_nullCounterHoursThreshold > 0 && nullCounterHours >= _nullCounterHoursThreshold)
                             {
-                                IsProcessingComplete = true;
-                                await RetrieveAndSubmitUpdatesToOpenSearchDatabase();
-                                _cancelSource.Cancel();
-                                _logger.LogInformation("No more categorisation results found on update queue.  Open Search Update service will now finish processing.");
+                                TimeSpan tsSinceNoSqsResults = TimeSpan.FromHours(nullCounterHours);
+                                string logMessage = GetNoUpdatesLogMessage("No taxonomy categorisation results have been retrieved from the SQS queue in the last ", tsSinceNoSqsResults);
+                                _logger.LogWarning(logMessage);
                             }
+
+                            nullCounterHours++;
+
+                            // If we didn't get anything back, Wait an hour before trying again...
+                            await Task.Delay(TimeSpan.FromHours(1));
+                           //await Task.Delay(TimeSpan.FromMinutes(1));  // used during dev to simulate hours from minutes.
                         }
                     }
                 } 
@@ -194,7 +196,8 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
         private async Task PeriodicSearchDatabaseUpdateAsync(TimeSpan interval,  CancellationToken cancellationToken)
         {
-           DateTime _lastOpenSearchUpdateTime = DateTime.Now;
+           DateTime lastOpenSearchUpdateTime = DateTime.Now;
+           DateTime lastLogMsgOrUpdateTime = DateTime.Now;
            int minutesSinceLastNoUpdatesLogMessage = 0;
            TimeSpan timeSinceLastOpenSearchUpdateCheck = interval;
 
@@ -206,27 +209,24 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                     {
                         Task delayTask = Task.Delay(interval, cancellationToken);
                         await RetrieveAndSubmitUpdatesToOpenSearchDatabase();
-                        
-                        await delayTask;
+                        lastOpenSearchUpdateTime = DateTime.Now;
+                        lastLogMsgOrUpdateTime = DateTime.Now;
 
+                        await delayTask;
                     }
                     else
                     {
-                        if (timeSinceLastOpenSearchUpdateCheck >= TimeSpan.FromMinutes(5))
+                        TimeSpan tsSinceLastUpdate = DateTime.Now - lastOpenSearchUpdateTime;
+                        if (_nullCounterHoursThreshold > 0 && tsSinceLastUpdate >= TimeSpan.FromHours(_nullCounterHoursThreshold)  && (DateTime.Now - lastLogMsgOrUpdateTime) >= TimeSpan.FromHours(1))
                         {
-                            
-                            int minutesSinceLastUpdate = Convert.ToInt32(Math.Round(timeSinceLastOpenSearchUpdateCheck.TotalMinutes));
-                            if (minutesSinceLastUpdate % 5 == 0 && minutesSinceLastUpdate > minutesSinceLastNoUpdatesLogMessage)
-                            {
-                                minutesSinceLastNoUpdatesLogMessage = minutesSinceLastUpdate;
-                                _logger.LogInformation($"No Taxonomy updates have been received by the Open Search" +
-                                    $" update service in the last {minutesSinceLastUpdate} minutes.  Resetting the update counter.");
-                                _totalInfoAssetsUpdated = 0;
-                            }
+                            string logMessage = GetNoUpdatesLogMessage("No Taxonomy categorisation results have been retrieved from the internal queue for submission to Open Search in  the last ", tsSinceLastUpdate);
+                            _logger.LogWarning(logMessage);
+                            lastLogMsgOrUpdateTime = DateTime.Now;
                         }
                     }
 
-                    timeSinceLastOpenSearchUpdateCheck = DateTime.Now - _lastOpenSearchUpdateTime;
+                    
+                    timeSinceLastOpenSearchUpdateCheck = DateTime.Now - lastOpenSearchUpdateTime;
                 }
             }
             catch (Exception ex)
@@ -281,8 +281,8 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
 
                 int totalForThisBulkUpdateOperation = listOfIAViewUpdatesToProcess.Count;
                 _logger.LogInformation($"Completed bulk update in Open Search for {totalForThisBulkUpdateOperation} items: ");
-                _totalInfoAssetsUpdated += totalForThisBulkUpdateOperation;
-                _logger.LogInformation($" Category data for {_totalInfoAssetsUpdated} assets has now been added or updated in Open Search.");
+                _totalInfoAssetsUpdatedInCurrentSession += totalForThisBulkUpdateOperation;
+                _logger.LogInformation($" Category data for {_totalInfoAssetsUpdatedInCurrentSession} assets has now been added or updated in Open Search.");
                 _logger.LogInformation($" There are currently {_internalQueue.Count} results on the internal queue that have been retrieved from Amazon SQS and are awaiting submission to the database.");
             }
             catch (Exception ex)
@@ -298,12 +298,41 @@ namespace NationalArchives.Taxonomy.Common.Service.Impl
                 _logger.LogInformation("Submitting single Asset update to Open Search: " + item.ToString());
                 await _targetOpenSearchRepository.Save(item);
                 _logger.LogInformation($"Completed single Asset in Open Search: {item.ToString()}." );
-                _totalInfoAssetsUpdated++;
+                _totalInfoAssetsUpdatedInCurrentSession++;
             }
             catch (Exception ex)
             {
                 throw;
             }
+        }
+
+        private string GetNoUpdatesLogMessage(string messageStart, TimeSpan tsReference)
+        {
+            int daysSinceLastUpdate = (int)Math.Floor(tsReference.TotalDays);
+            int hoursSinceLastUpdate = (int)Math.Floor(tsReference.TotalHours);
+
+            StringBuilder sb = new StringBuilder(messageStart);
+
+            if (daysSinceLastUpdate > 0)
+            {
+                sb.Append(daysSinceLastUpdate);
+                sb.Append(daysSinceLastUpdate == 1 ? " day" : " days");
+
+                if (tsReference.Hours > 0)
+                {
+                    sb.Append(" and " + tsReference.Hours + (tsReference.Hours == 1 ? "hour." : "hours."));
+                }
+                else
+                {
+                    sb.Append(".");
+                }
+            }
+            else
+            {
+                sb.Append(Math.Floor(tsReference.TotalHours) + (tsReference.TotalHours == 1 ? " hour." : " hours."));
+            }
+
+            return sb.ToString();
         }
 
         public void Dispose()

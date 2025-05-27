@@ -10,5 +10,7 @@ namespace NationalArchives.Taxonomy.Batch.FullReindex.Producers
         int TotalIdentifiersFetched { get; }
 
         int CurrentQueueSize { get; }
+
+        string Source {  get; }
     }
 }

@@ -5,6 +5,8 @@
     <TargetFramework>net8.0</TargetFramework>
     <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
     <UserSecretsId>0acc472f-079b-40ce-8c52-b94d0f5becba</UserSecretsId>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
