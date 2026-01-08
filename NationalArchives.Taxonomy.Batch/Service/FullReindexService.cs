@@ -124,7 +124,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
                 {
                     if (iaidProducerTask.Exception != null)
                     {
-                        string msg = "Error retrieving Information assets from Open Search. Please check the logs for errors.";
+                        string msg = "Error retrieving Information assets from the IAID Producer source (Open Search or SQS as configured). Please check the logs for errors.";
                         _StopMessage = msg;
                         _logger.LogError(msg);
                         _logger.LogError(iaidProducerTask.Exception.Message);

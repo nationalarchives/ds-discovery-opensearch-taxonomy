@@ -135,7 +135,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                 AllowLeadingWildcard = true
             };  // QueryParser from org.apache.lucene.queryparser.classic; 
 
-            Query searchQuery;
+            Query searchQuery = null;
             try
             {
                 searchQuery = parser.Parse(queryString);
@@ -143,6 +143,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
             catch (ParseException e)
             {
                 throw new TaxonomyException(TaxonomyErrorType.INVALID_CATEGORY_QUERY, e);
+            }
+            catch (IOException ioex)
+            {
+                Console.WriteLine("IO Exception");
+                return searchQuery;
             }
             return searchQuery;
         }

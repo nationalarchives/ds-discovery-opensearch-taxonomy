@@ -73,7 +73,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
 
         public int IaidCount
         {
-            get => allIaidsReceived.Count;
+            get => allIaidsReceived?.Count ?? 0;
         }
 
         protected abstract Task HandleTextMessage(IList<string> iaids);
