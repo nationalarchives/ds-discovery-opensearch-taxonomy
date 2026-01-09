@@ -35,7 +35,7 @@ namespace NationalArchives.Taxonomy.Batch.Service
 
  
 
-        private void OutputCompletion(Task task)
+        private async Task OutputCompletion(Task task)
         {
             if (task.IsCanceled)
             {
@@ -55,48 +55,49 @@ namespace NationalArchives.Taxonomy.Batch.Service
                 _logger.LogInformation("Processing of daily updates completed.");
                 _logger.LogError("The daily update service is stopping.");
             }
-            StopAsync(_dailyUpdatesCancelledSource.Token);
+            await StopAsync(_dailyUpdatesCancelledSource.Token);
         }
 
-        public override Task StopAsync(CancellationToken cancellationToken)
+        public override async Task StopAsync(CancellationToken cancellationToken)
         {
             try
             {
-                base.StopAsync(cancellationToken);
                 _logger.LogInformation("Stopping Daily Updates Manager Service.");
-                this.Dispose();
-                return Task.CompletedTask;
+                await base.StopAsync(cancellationToken);
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
-                return Task.FromException(e);
             }
         }
 
         public override void Dispose()
         {
             _timer.Dispose();
-            foreach(var consumer in _updateMessageQueueConsumers)
+            if (_updateMessageQueueConsumers != null)
             {
-                consumer?.Dispose();
+                foreach (var consumer in _updateMessageQueueConsumers)
+                {
+                    consumer?.Dispose();
+                } 
             }
 
             _dailyUpdatesCancelledSource?.Dispose();
+            base.Dispose();
         }
 
-        private void CategoriseDocMessageConsumer_FatalException(object sender, MessageProcessingEventArgs e)
+        private async Task CategoriseDocMessageConsumer_FatalException(object sender, MessageProcessingEventArgs e)
         {
             Console.WriteLine("Fatal exception occured during processing of daily updates, please check the logs for details.");
-            StopAsync(new CancellationToken());
+            await StopAsync(new CancellationToken());
         }
 
-        private void CategoriseDocMessageConsumer_ProcessingCompleted(object sender, MessageProcessingEventArgs e)
+        private async Task CategoriseDocMessageConsumer_ProcessingCompleted(object sender, MessageProcessingEventArgs e)
         {
             try
             {
                 _logger.LogInformation(e.Message);
-                StopAsync(new CancellationToken());
+                await StopAsync(new CancellationToken());
             }
             catch (Exception ex)
             {
