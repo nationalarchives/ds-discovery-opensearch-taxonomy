@@ -345,7 +345,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                 catch (Exception e)
                 {
                     Console.WriteLine("Unable to parse query: " + c.Id);
-                    throw new TaxonomyException(TaxonomyErrorType.INVALID_CATEGORY_QUERY,$"Unable to parse query: {c.Id}", e);
+                    throw new TaxonomyException(TaxonomyErrorType.INVALID_CATEGORY_QUERY,$"Unable to parse query: {c.Id}, {c.Title}", e);
                 }
             }
             _categoriesWithLuceneQueries = categoriesWithluceneQueries;
