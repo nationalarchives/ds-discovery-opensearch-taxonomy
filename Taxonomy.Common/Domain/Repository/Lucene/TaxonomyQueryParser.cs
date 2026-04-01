@@ -42,21 +42,33 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                 int firstDate;
                 int lastDate;
 
-                if (!int.TryParse(part1, out firstDate))
+                int? nFirstDate;
+                int? nLastDate;
+
+                if (! int.TryParse(part1, out firstDate))
                 {
-                    firstDate = Int32.MinValue;
+                    nFirstDate = null;
+                }
+                else
+                {
+                    nFirstDate = firstDate;
                 }
 
                 if (!int.TryParse(part2, out lastDate))
                 {
-                    lastDate = Int32.MaxValue;
+                    nLastDate = null;
+                }
+                else
+                {
+                    nLastDate = lastDate;
                 }
 
-                return NumericRangeQuery.NewInt32Range(field, firstDate, lastDate,
-                    startInclusive, endInclusive);
+                    return NumericRangeQuery.NewInt32Range(field, nFirstDate, nLastDate,
+                        startInclusive, endInclusive);
             }
 
-            TermRangeQuery termRangeQuery = (TermRangeQuery)base.GetRangeQuery(field, part1, part2, startInclusive, endInclusive);
+            TermRangeQuery termRangeQuery = TermRangeQuery.NewStringRange(field, part1, part2, startInclusive, endInclusive);
+            //TermRangeQuery termRangeQuery = (TermRangeQuery)base.GetRangeQuery(field, part1, part2, startInclusive, endInclusive);
 
             return termRangeQuery;
         }
@@ -79,7 +91,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
             if(query.Contains(InformationAssetViewFields.START_DATE.ToString()))
             {
                 // string pattern = @"START_DATE:\s*\{(\d{4})-(\d{2})-(\d{2})\s+TO\s+\*\}";
-                string replacement = @"NUM_START_DATE: {$1$2$3 TO *}";
+                string replacement = @"NUM_START_DATE:[$1$2$3 TO *]";
 
                 // query = Regex.Replace(query, pattern, replacement);
                 query = startDateRegex.Replace(query, replacement);
@@ -88,7 +100,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
             if (query.Contains(InformationAssetViewFields.END_DATE.ToString()))
             {
                 //string patternEnd = @"END_DATE:\s*\{\*\s+TO\s+(\d{4})-(\d{2})-(\d{2})\}";
-                string replacementEnd = @"NUM_END_DATE: {* TO $1$2$3}";
+                string replacementEnd = @"NUM_END_DATE:[* TO $1$2$3]";
 
                 //query = Regex.Replace(query, patternEnd, replacementEnd);
                 query = endDateRegex.Replace(query, replacementEnd);

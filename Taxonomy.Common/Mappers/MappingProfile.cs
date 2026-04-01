@@ -24,6 +24,8 @@ namespace NationalArchives.Taxonomy.Common.Mappers
                 .ForMember(dest => dest.Series, opt => opt.MapFrom(source => source.SERIES_CODE))
                 .ForMember(dest => dest.Subjects, opt => opt.MapFrom(source => source.SUBJECT))
                 .ForMember(dest => dest.DocReference, opt => opt.MapFrom(source => source.ID))
+                .ForMember(dest => dest.NUM_START_DATE, opt => opt.MapFrom(source => source.NUM_START_DATE))
+                .ForMember(dest => dest.NUM_END_DATE, opt => opt.MapFrom(source => source.NUM_END_DATE))
                 .ForMember(dest => dest.ContextDescription, opt => opt.MapFrom(source => source.CONTEXT)).IncludeAllDerived()
                 .Include<OpenSearchRecordAssetView, InformationAssetViewWithScore>().ReverseMap();
 

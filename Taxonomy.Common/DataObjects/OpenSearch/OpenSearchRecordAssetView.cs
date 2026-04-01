@@ -13,8 +13,8 @@ namespace NationalArchives.Taxonomy.Common.DataObjects.OpenSearch
         public double? Score { get; set; }
         public string CATALOGUE_REFERENCE { get; set; } = string.Empty;
         public int SOURCE { get; set; }
-        public DateTime START_DATE { get; set; } = DateTime.MinValue;
-        public DateTime END_DATE { get; set; } = DateTime.MaxValue;
+        public int NUM_START_DATE { get; set; } = 0;
+        public int NUM_END_DATE { get; set; } = 0;
         public string COVERING_DATES { get; set; } = string.Empty;
         public string TITLE { get; set; } = string.Empty;
         public string DESCRIPTION { get; set; } = string.Empty;

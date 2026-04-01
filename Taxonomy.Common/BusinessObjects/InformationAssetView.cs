@@ -1,4 +1,5 @@
 ﻿using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
+using System;
 
 namespace NationalArchives.Taxonomy.Common.Domain
 {
@@ -18,6 +19,8 @@ namespace NationalArchives.Taxonomy.Common.Domain
         public string CoveringDates { get; set; }
         public string Series { get; set; }
         public string Source { get; set; }
+        public int NUM_START_DATE { get; set; }   
+        public int NUM_END_DATE { get; set; }     
     }
 
     public class InformationAssetViewWithScore : InformationAssetView, ISearchResult
