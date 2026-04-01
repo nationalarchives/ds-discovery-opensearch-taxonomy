@@ -59,6 +59,12 @@ namespace NationalArchives.Taxonomy.CLI
                 foreach(Exception e in ae.InnerExceptions)
                 {
                     Console.WriteLine("Error Occured: " + e.Message);
+                    Exception nextInner = e.InnerException;
+                    while (nextInner != null)
+                    {
+                        Console.WriteLine("Inner Exception: " + nextInner.Message);
+                        nextInner = nextInner.InnerException;
+                    }
                 }
                 return -1;
             }
@@ -69,6 +75,12 @@ namespace NationalArchives.Taxonomy.CLI
                 if (e.InnerException != null)
                 {
                     Console.WriteLine(e.InnerException.Message);
+                    Exception nextInner = e.InnerException;
+                    while (nextInner != null)
+                    {
+                        Console.WriteLine("Inner Exception: " + nextInner.Message);
+                        nextInner = nextInner.InnerException;
+                    }
                 }
                 return -1;
             }

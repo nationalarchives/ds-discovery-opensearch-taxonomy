@@ -2,7 +2,7 @@
   "profiles": {
     "TaxonomyCLI": {
       "commandName": "Project",
-      "commandLineArgs": "-t:C12345",
+      "commandLineArgs": "-t:C17301481",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }

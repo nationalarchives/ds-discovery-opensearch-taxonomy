@@ -233,6 +233,16 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                     break;
             }
 
+            if (iaView.NUM_START_DATE != 0)
+            {
+                listOfFields.Add(new Int32Field("NUM_START_DATE", iaView.NUM_START_DATE, Field.Store.NO));
+            }
+
+            if (iaView.NUM_END_DATE != 0)
+            {
+                listOfFields.Add(new Int32Field("NUM_END_DATE", iaView.NUM_END_DATE, Field.Store.NO));
+            }
+
             AddFieldsToLuceneDocument(document, listOfFields);
 
             return document;
@@ -345,6 +355,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                 catch (Exception e)
                 {
                     Console.WriteLine("Unable to parse query: " + c.Id);
+                    throw new TaxonomyException(TaxonomyErrorType.INVALID_CATEGORY_QUERY,$"Unable to parse query: {c.Id}, {c.Title}", e);
                 }
             }
             _categoriesWithLuceneQueries = categoriesWithluceneQueries;

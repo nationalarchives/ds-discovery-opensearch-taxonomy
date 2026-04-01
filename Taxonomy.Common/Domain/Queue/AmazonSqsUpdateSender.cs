@@ -225,7 +225,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                     try
                     {
                         _logger.LogInformation("Retrieved a batch of {currentBatch.Count} from the internal queue.  Sending to SQS queue {_sqsParams.QueueUrl}", currentBatch.Count, _sqsParams.QueueUrl);
-                        _logger.LogInformation("There are currently {_blockingCollection.Count} results on the internal queue awaiting submission to SQS, {_resultsSent} results have been sent to the queue.", _blockingCollection.Count, _resultsSent);
+                        _logger.LogInformation("There are currently {_blockingCollection.Count} results on the internal queue awaiting submission to SQS, {_resultsSent} results have been sent to the external (SQS) queue.", _blockingCollection.Count, _resultsSent);
 
                         RegionEndpoint region = RegionEndpoint.GetBySystemName(_sqsParams.Region);
                         AWSCredentials credentials = _sqsParams.GetCredentials(ROLE_SESSION_NAME);
