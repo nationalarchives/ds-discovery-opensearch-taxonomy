@@ -73,44 +73,48 @@ namespace NationalArchives.Taxonomy.Common.UnitTests
         }
 
         [TestMethod]
-        [ExpectedException(typeof(TaxonomyException))]
         public void TestCategoriseSingle_CallWithNullInformationAssetAndCategoryInputList_ReturnsListOfCategorisationResults()
         {
-            var categoriserService = new QueryBasedCategoriserService(_iaViewRepository, _categoryRepository);
-
-            InformationAssetView testAsset = TestInformationAsset();
-            IList<Category> cachedCategories = TestCategories();
-
-            var awaiter = categoriserService.TestCategoriseSingle(null, true, cachedCategories).GetAwaiter();
-            var result = awaiter.GetResult();
+            Assert.Throws<TaxonomyException>(() =>
+            {
+                 var categoriserService = new QueryBasedCategoriserService(_iaViewRepository, _categoryRepository);
+                InformationAssetView testAsset = TestInformationAsset();
+                IList<Category> cachedCategories = TestCategories();
+                var awaiter = categoriserService.TestCategoriseSingle(null, true, cachedCategories).GetAwaiter();
+                var result = awaiter.GetResult();
+            });
         }
 
         [TestMethod]
-        [ExpectedException(typeof(TaxonomyException))]
         public void TestCategoriseSingle_CallWithNullIaid_ReturnsListOfCategorisationResults()
         {
-            var categoriserService = new QueryBasedCategoriserService(_iaViewRepository, _categoryRepository);
+            Assert.Throws<TaxonomyException>(() =>
+            {
+                var categoriserService = new QueryBasedCategoriserService(_iaViewRepository, _categoryRepository);
 
-            InformationAssetView testAsset = TestInformationAsset();
-            var awaiter = categoriserService.TestCategoriseSingle(null).GetAwaiter();
-            var result = awaiter.GetResult();
+                InformationAssetView testAsset = TestInformationAsset();
+                var awaiter = categoriserService.TestCategoriseSingle(null).GetAwaiter();
+                var result = awaiter.GetResult();
 
-            Assert.IsNotNull(result);
-            Assert.IsInstanceOfType(result, typeof(IList<CategorisationResult>));
+                Assert.IsNotNull(result);
+                Assert.IsInstanceOfType(result, typeof(IList<CategorisationResult>));
+            });
         }
 
         [TestMethod]
-        [ExpectedException(typeof(TaxonomyException))]
         public void TestCategoriseSingle_CallWithEmptyIaid_ReturnsListOfCategorisationResults()
         {
-            var categoriserService = new QueryBasedCategoriserService(_iaViewRepository, _categoryRepository);
+            Assert.Throws<TaxonomyException>(() =>
+            {
+                var categoriserService = new QueryBasedCategoriserService(_iaViewRepository, _categoryRepository);
 
-            InformationAssetView testAsset = TestInformationAsset();
-            var awaiter = categoriserService.TestCategoriseSingle(string.Empty).GetAwaiter();
-            var result = awaiter.GetResult();
+                InformationAssetView testAsset = TestInformationAsset();
+                var awaiter = categoriserService.TestCategoriseSingle(string.Empty).GetAwaiter();
+                var result = awaiter.GetResult();
 
-            Assert.IsNotNull(result);
-            Assert.IsInstanceOfType(result, typeof(IList<CategorisationResult>));
+                Assert.IsNotNull(result);
+                Assert.IsInstanceOfType(result, typeof(IList<CategorisationResult>));
+            });
         }
 
         private InformationAssetView TestInformationAsset()
