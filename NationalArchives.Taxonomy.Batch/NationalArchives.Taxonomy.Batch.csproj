@@ -33,7 +33,6 @@
     <PackageReference Include="Microsoft.Extensions.Logging.EventSource" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.TraceSource" Version="10.0.5" />
     <PackageReference Include="NLog.Extensions.Logging" Version="6.1.2" />
-    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.5" />
   </ItemGroup>
 
