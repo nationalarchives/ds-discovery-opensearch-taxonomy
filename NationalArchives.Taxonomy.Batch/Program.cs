@@ -106,7 +106,8 @@ namespace NationalArchives.Taxonomy.Batch
 
             CategorisationParams categorisationParams = config.GetSection(categorisationParamsConfigSource).Get<CategorisationParams>();
 
-            services.AddAutoMapper(mc => mc.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }));
+            string autoMapperLicenseKey = config.GetValue<string>("AutoMapperLicenseKey");
+            services.AddAutoMapper(cfg => { cfg.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }); cfg.LicenseKey = autoMapperLicenseKey; });
 
             services.AddSingleton<ILoggerFactory, LoggerFactory>();
             services.AddSingleton(typeof(ILogger<Program>), typeof(Logger<Program>));

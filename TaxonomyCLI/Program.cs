@@ -97,7 +97,8 @@ namespace NationalArchives.Taxonomy.CLI
         {
             var services = new ServiceCollection();
 
-            services.AddAutoMapper(mc => mc.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }));
+            string autoMapperLicenseKey = config.GetValue<string>("AutoMapperLicenseKey");
+            services.AddAutoMapper(cfg => { cfg.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }); cfg.LicenseKey = autoMapperLicenseKey; });
 
             services.AddSingleton<ILoggerFactory, LoggerFactory>();
             services.AddSingleton(typeof(ILogger<Analyzer>), typeof(Logger<Analyzer>));

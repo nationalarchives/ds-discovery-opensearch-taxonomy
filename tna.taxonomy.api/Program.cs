@@ -14,7 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
 // Add services to the container.
-builder.Services.AddAutoMapper(mc => mc.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }));
+string autoMapperLicenseKey = config.GetValue<string>("AutoMapperLicenseKey");
+builder.Services.AddAutoMapper(cfg => { cfg.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }); cfg.LicenseKey = autoMapperLicenseKey; });
 
 builder.Services.AddSingleton(config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>());
 builder.Services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
