@@ -83,7 +83,15 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 }
                 else
                 {
-                    logger.LogInformation($"Long polling request to SQS queue brought back {message.Messages.Count} messages containing {message.Messages.SelectMany(m => m.MessageId).Count()} taxonomy results.");
+                    if (message.Messages?.Count > 0)
+                    {
+                        logger.LogInformation($"Long polling request to SQS queue brought back {message.Messages?.Count} messages containing {message.Messages?.SelectMany(m => m.MessageId).Count()} taxonomy results.");
+
+                    }
+                    else
+                    {
+                        logger.LogInformation($"Long polling request to SQS queue brought back no taxonomy results.");
+                    }
                 }
 
                 if (message != null && message.Messages.Count > 0)

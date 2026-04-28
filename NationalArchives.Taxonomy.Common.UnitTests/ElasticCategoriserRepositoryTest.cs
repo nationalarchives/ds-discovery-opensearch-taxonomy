@@ -108,24 +108,26 @@ namespace NationalArchives.Taxonomy.Common.UnitTests
 
 
         [TestMethod]
-        [ExpectedException(typeof(TaxonomyException))]  
         public void FindRelevantCategoriesForDocument_TextCasPunc()
         {
-            string defaultField = "textnocasnopunc";
-            var analyzer = GetAnalyzer(AnalyzerKind.IAViewTextCasPunc);
+            Assert.Throws<TaxonomyException>(() =>
+            {
+                string defaultField = "textnocasnopunc";
+                var analyzer = GetAnalyzer(AnalyzerKind.IAViewTextCasPunc);
 
-            var luceneHelperTools = new LuceneHelperTools(defaultField, analyzer, _queryFields);
+                var luceneHelperTools = new LuceneHelperTools(defaultField, analyzer, _queryFields);
 
-            var openSearchCategoryRepository = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyzer, luceneHelperTools: luceneHelperTools, logger: null);
+                var openSearchCategoryRepository = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyzer, luceneHelperTools: luceneHelperTools, logger: null);
 
-            InformationAssetView iaView = GetInformationAssetView();
+                InformationAssetView iaView = GetInformationAssetView();
 
-            IList<CategorisationResult> categorisationResults = openSearchCategoryRepository.FindRelevantCategoriesForDocument(iaView, _listOfCategories);
+                IList<CategorisationResult> categorisationResults = openSearchCategoryRepository.FindRelevantCategoriesForDocument(iaView, _listOfCategories);
 
-            Assert.IsNotNull(categorisationResults);
-            Assert.IsFalse(categorisationResults.Count == 0);
+                Assert.IsNotNull(categorisationResults);
+                Assert.IsFalse(categorisationResults.Count == 0);
 
-            Assert.IsTrue(categorisationResults.Select(r => r.CategoryName).ToArray().Contains("Air Force"));
+                Assert.IsTrue(categorisationResults.Select(r => r.CategoryName).ToArray().Contains("Air Force"));
+            });
 
         }
 
