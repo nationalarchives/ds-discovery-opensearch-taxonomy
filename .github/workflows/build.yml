@@ -1,0 +1,58 @@
+name: Taxonomy API Build and Push
+
+permissions:
+      id-token: write
+      contents: read 
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_taxonomy_api:
+        description: 'Taxonomy API'
+        required: false 
+        type: boolean
+      taxonomy-api-version-tag:
+        description: 'Taxonomy API version Tag'     
+        required: true
+        default: 'latest'
+
+jobs:
+  Docker:
+    name: Build and Push Taxonomy Docker Images
+    runs-on: ubuntu-latest
+    
+    environment: inter-site 
+    env:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}            
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.head_ref }}
+        fetch-depth: 0
+      
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ env.AWS_ROLE_ARN }}
+        aws-region: eu-west-2
+        role-session-name: Taxonomy_GitAction        
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build, tag, and push the API to ECR
+      if: ${{ github.event.inputs.create_taxonomy_api == 'true' }}
+      id: build-push-API
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: taxonomy-api
+        IMAGE_TAG: ${{ github.event.inputs.taxonomy-api-version-tag }}
+      run: |
+        # Build the API docker container and push it to ECR 
+        docker build -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} -f Dockerfile .
+        echo "Pushing image to ECR..."
+        docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+        echo "::set-output name=image::${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"    
