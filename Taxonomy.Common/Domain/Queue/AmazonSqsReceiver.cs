@@ -99,9 +99,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                     foreach (Message msg in message?.Messages)
                     {
                         IList<T> messageResult = _messageReader.ReadMessage(msg.Body);
-                        //char[] delimiterChars = { ' ', ',', '.', ':', '\t' };
-                        //string[] result = msg.Body.Split(delimiterChars);
-                        //List<T> result = JsonConvert.DeserializeObject<List<T>>(msg.Body);
                         results.AddRange(messageResult);
                         msgHandlesForDelete.Add(new DeleteMessageBatchRequestEntry() { Id = msg.MessageId, ReceiptHandle = msg.ReceiptHandle });
                     }
