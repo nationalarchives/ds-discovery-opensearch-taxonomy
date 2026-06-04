@@ -83,7 +83,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                 }
                 else
                 {
-                    if (message.Messages?.Count > 0)
+                    if (message?.Messages?.Count > 0)
                     {
                         logger.LogInformation($"Long polling request to SQS queue brought back {message.Messages?.Count} messages containing {message.Messages?.SelectMany(m => m.MessageId).Count()} taxonomy results.");
 
@@ -94,14 +94,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Queue
                     }
                 }
 
-                if (message != null && message.Messages.Count > 0)
+                if (message != null && message.Messages?.Count > 0)
                 {
                     foreach (Message msg in message?.Messages)
                     {
                         IList<T> messageResult = _messageReader.ReadMessage(msg.Body);
-                        //char[] delimiterChars = { ' ', ',', '.', ':', '\t' };
-                        //string[] result = msg.Body.Split(delimiterChars);
-                        //List<T> result = JsonConvert.DeserializeObject<List<T>>(msg.Body);
                         results.AddRange(messageResult);
                         msgHandlesForDelete.Add(new DeleteMessageBatchRequestEntry() { Id = msg.MessageId, ReceiptHandle = msg.ReceiptHandle });
                     }
