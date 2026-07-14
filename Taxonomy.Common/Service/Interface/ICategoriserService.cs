@@ -28,7 +28,7 @@ namespace NationalArchives.Taxonomy.Common.Service
 
         Task<IList<T>> CategoriseSingle(string docReference);
 
-        Task<IDictionary<string, List<T>>> CategoriseMultiple(string[] docReferences, IList<Category> cachedCategories = null);
+        Task<IDictionary<string, List<T>>> CategoriseMultiple(string[] docReferences, IList<Category> cachedCategories = null, bool saveResultsToQueue = true);
 
         /**
          * Categorise a document and save the found categories

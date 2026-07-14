@@ -279,7 +279,7 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
-        public async Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(string[] docReferences, IList<Category> cachedCategories)
+        public async Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(string[] docReferences, IList<Category> cachedCategories, bool saveResultsToQueue = true)
         {
 
             foreach (string s in docReferences)
@@ -303,10 +303,15 @@ namespace NationalArchives.Taxonomy.Common.Service
                 Console.WriteLine($"Fetched {assets1.Count} from Elastic Search for categorising in {Math.Round(fetchTime.TotalSeconds, 5)} seconds");
 
                 IDictionary<string, List<CategorisationResult>> listOfCategorisationResultsForAllAssets = await TestCategoriseMultiple(assets1.ToArray(), false, sourceCategories);
-                foreach (var listOfCategorisationResults in listOfCategorisationResultsForAllAssets)
+
+                if (saveResultsToQueue)
                 {
-                    SaveResultsToIntermUpdateQueue(listOfCategorisationResults.Key, listOfCategorisationResults.Value); 
+                    foreach (var listOfCategorisationResults in listOfCategorisationResultsForAllAssets)
+                    {
+                        SaveResultsToIntermUpdateQueue(listOfCategorisationResults.Key, listOfCategorisationResults.Value);
+                    } 
                 }
+
                 return listOfCategorisationResultsForAllAssets;
             }
             catch (Exception e)
