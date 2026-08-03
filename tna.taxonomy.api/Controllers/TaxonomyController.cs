@@ -117,7 +117,7 @@ namespace tna.taxonomy.api.Controllers
 
         [Route("CategoriseMultiple")]
         [HttpPost]
-        public async Task<ActionResult<IDictionary<string, List<CategorisationResult>>>> CategoriseMultiple(IList<string> iaids)
+        public async Task<ActionResult<IDictionary<string, IList<CategorisationResult>>>> CategoriseMultiple(IList<string> iaids)
         {
 
             if (iaids == null || iaids.Count == 0) 
@@ -129,6 +129,33 @@ namespace tna.taxonomy.api.Controllers
             try
             {
                 IDictionary<string, List<CategorisationResult>> results = await _categoriserService.CategoriseMultiple(docReferences: iaids.ToArray(),  saveResultsToQueue: false);
+                return Ok(results);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, $"Error on  Categorisation request for multiple documents");
+                return new ContentResult
+                {
+                    StatusCode = (int)HttpStatusCode.InternalServerError,
+                    Content = "An error occurred while processing the request.",
+                    ContentType = "text/plain"
+                };
+            }
+        }
+
+        [Route("CategoriseMultipleRecordAssets")]
+        [HttpPost]
+        public async Task<ActionResult<IDictionary<string, IList<CategorisationResult>>>> CategoriseMultiple(IList<InformationAssetView> assets)
+        {
+            if (assets == null || assets.Count == 0)
+            {
+                _logger.LogError("At least one asset must be provided.");
+                return BadRequest();
+            }
+
+            try
+            {
+                IDictionary<string, List<CategorisationResult>> results = await _categoriserService.CategoriseMultiple(assets: assets);
                 return Ok(results);
             }
             catch (Exception e)

@@ -319,5 +319,21 @@ namespace NationalArchives.Taxonomy.Common.Service
                 throw;
             }
         }
+
+        public async Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(IList<InformationAssetView> assets, IList<Category> cachedCategories)
+        {
+
+            IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
+
+            try
+            {
+                IDictionary<string, List<CategorisationResult>> listOfCategorisationResultsForAllAssets = await TestCategoriseMultiple(assets.ToArray(), false, sourceCategories);
+                return listOfCategorisationResultsForAllAssets;
+            }
+            catch (Exception e)
+            {
+                throw;
+            }
+        }
     }
 }
