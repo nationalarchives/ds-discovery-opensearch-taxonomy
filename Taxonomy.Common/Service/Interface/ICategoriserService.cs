@@ -1,4 +1,5 @@
 ﻿using NationalArchives.Taxonomy.Common.BusinessObjects;
+using NationalArchives.Taxonomy.Common.Domain;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Mongo;
 using System;
 using System.Collections.Generic;
@@ -28,7 +29,15 @@ namespace NationalArchives.Taxonomy.Common.Service
 
         Task<IList<T>> CategoriseSingle(string docReference);
 
-        Task<IDictionary<string, List<T>>> CategoriseMultiple(string[] docReferences, IList<Category> cachedCategories = null);
+        Task<IDictionary<string, List<T>>> CategoriseMultiple(string[] docReferences, IList<Category> cachedCategories = null, bool saveResultsToQueue = true);
+
+        /// <summary>
+        /// Category multiple assets where we already have the complete assets, not just the IDs
+        /// </summary>
+        /// <param name="assets">List of InformationAssetView</param>
+        /// <param name="cachedCategories"> Cached Taxonomy categories.</param>
+        /// <returns>A dictionary where the key is the asset ID and the value a list of CategorisationResult</returns>
+        Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(IList<InformationAssetView> assets, IList<Category> cachedCategories = null);
 
         /**
          * Categorise a document and save the found categories
@@ -83,5 +92,6 @@ namespace NationalArchives.Taxonomy.Common.Service
          */
         IList<IAViewUpdate> GetNewCategorisedDocumentsAfterDocumentAndUpToNSecondsInPast(IAViewUpdate afterIAViewUpdate,
             int nbOfSecondsInPast, int limit);
+        
     }
 }
