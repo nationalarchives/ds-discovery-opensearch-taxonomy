@@ -1,8 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using NationalArchives.Taxonomy.Common;
+using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.Domain;
 using NationalArchives.Taxonomy.Common.Service;
-using NationalArchives.Taxonomy.Common.BusinessObjects;
+using System.Net;
 
 namespace tna.taxonomy.api.Controllers
 {
@@ -75,7 +76,97 @@ namespace tna.taxonomy.api.Controllers
             catch (Exception e)
             {
                 _logger.LogError(e, $"Error on Test Categorisation of {testCategoriseSingleRequest.DocReference}");
+                return new ContentResult
+                {
+                    StatusCode = (int)HttpStatusCode.InternalServerError,
+                    Content = "An error occurred while processing the request.",
+                    ContentType = "text/plain"
+                };
+            }
+        }
+
+        [Route("CategoriseSingle")]
+        [HttpPost]
+        public async Task<ActionResult<IList<CategorisationResult>>> CategoriseSingle(string iaid)
+        {
+            if (String.IsNullOrEmpty(iaid))
+            {
+                _logger.LogError("No document info supplied for categorisation request!");
                 return BadRequest();
+            }
+
+            try
+            {
+                // N.B. we call TestCategoriseSingle here rather than CategoriseSingle as we just want to get the
+                // results without sending them to the queue (which should be handled by the caller).
+                IList<CategorisationResult> results = await _categoriserService.TestCategoriseSingle(iaid);
+                return Ok(results);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, $"Error on Categorisation of {iaid}");
+                return new ContentResult
+                {
+                    StatusCode = (int)HttpStatusCode.InternalServerError,
+                    Content = "An error occurred while processing the request.",
+                    ContentType = "text/plain"
+                };
+            }
+        }
+
+
+        [Route("CategoriseMultiple")]
+        [HttpPost]
+        public async Task<ActionResult<IDictionary<string, IList<CategorisationResult>>>> CategoriseMultiple(IList<string> iaids)
+        {
+
+            if (iaids == null || iaids.Count == 0) 
+            {
+                _logger.LogError("At least one asset ID must be provided.");
+                return BadRequest();
+            }
+
+            try
+            {
+                IDictionary<string, List<CategorisationResult>> results = await _categoriserService.CategoriseMultiple(docReferences: iaids.ToArray(),  saveResultsToQueue: false);
+                return Ok(results);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, $"Error on  Categorisation request for multiple documents");
+                return new ContentResult
+                {
+                    StatusCode = (int)HttpStatusCode.InternalServerError,
+                    Content = "An error occurred while processing the request.",
+                    ContentType = "text/plain"
+                };
+            }
+        }
+
+        [Route("CategoriseMultipleRecordAssets")]
+        [HttpPost]
+        public async Task<ActionResult<IDictionary<string, IList<CategorisationResult>>>> CategoriseMultiple(IList<InformationAssetView> assets)
+        {
+            if (assets == null || assets.Count == 0)
+            {
+                _logger.LogError("At least one asset must be provided.");
+                return BadRequest();
+            }
+
+            try
+            {
+                IDictionary<string, List<CategorisationResult>> results = await _categoriserService.CategoriseMultiple(assets: assets);
+                return Ok(results);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, $"Error on  Categorisation request for multiple documents");
+                return new ContentResult
+                {
+                    StatusCode = (int)HttpStatusCode.InternalServerError,
+                    Content = "An error occurred while processing the request.",
+                    ContentType = "text/plain"
+                };
             }
         }
 
