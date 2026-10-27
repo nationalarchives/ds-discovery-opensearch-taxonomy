@@ -14,7 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
 // Add services to the container.
-string autoMapperLicenseKey = config.GetValue<string>("AutoMapperLicenseKey");
+string autoMapperLicenseKey = Environment.GetEnvironmentVariable("AutoMapperLicenseKey");
 builder.Services.AddAutoMapper(cfg => { cfg.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }); cfg.LicenseKey = autoMapperLicenseKey; });
 
 builder.Services.AddSingleton(config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>());
@@ -57,7 +57,12 @@ switch (categorySource)
         builder.Services.AddTransient<ICategoryRepository, MongoCategoryRepository>((ctx) =>
         {
             IMapper mapper = ctx.GetRequiredService<IMapper>();
-            MongoConnectionParams categoryDataMongoConnParams = config.GetSection("CategoryMongoParams").Get<MongoConnectionParams>();
+            MongoConnectionParams categoryDataMongoConnParams = new MongoConnectionParams
+            {
+                ConnectionString = Environment.GetEnvironmentVariable("CategoryMongo_ConnectionString"),
+                DatabaseName = Environment.GetEnvironmentVariable("CategoryMongo_DatabaseName"),
+                CollectionName = Environment.GetEnvironmentVariable("CategoryMongo_CollectionName")
+            };
             MongoCategoryRepository categoryRepo = new MongoCategoryRepository(categoryDataMongoConnParams, mapper);
             return categoryRepo;
         });
