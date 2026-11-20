@@ -112,6 +112,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
             throw new NotImplementedException();
         }
 
+        public Task RefreshCategories()
+        {
+            throw new NotImplementedException();
+        }
+
         public void Save(Category category)
         {
             throw new NotImplementedException();

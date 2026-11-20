@@ -27,6 +27,11 @@ builder.Services.AddScoped<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) 
     return recordAssetsElasticConnection;
 });
 
+foreach (var e in Environment.GetEnvironmentVariables())
+{
+    Console.WriteLine(e);
+}
+
 CategorySource categorySource = (CategorySource)Enum.Parse(typeof(CategorySource), config.GetValue<string>("CategorySource"));
 // Get the categories form either Mongo or Elastic
 switch (categorySource)

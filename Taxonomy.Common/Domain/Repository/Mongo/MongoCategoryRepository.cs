@@ -188,5 +188,10 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
         {
             _semaphore?.Dispose();
         }
+
+        public Task RefreshCategories()
+        {
+            throw new NotImplementedException();
+        }
     }
 }
