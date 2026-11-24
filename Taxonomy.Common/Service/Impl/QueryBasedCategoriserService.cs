@@ -16,27 +16,31 @@ namespace NationalArchives.Taxonomy.Common.Service
     {
         private readonly IIAViewRepository _iaViewRepository;
         private readonly ICategoryRepository _categoryRepository;
-        private readonly ICategoriserRepository _categoriserRepository;
+        private readonly ICategoriser _categoriser;
         private readonly IUpdateStagingQueueSender _stagingQueueSender;
         private readonly CancellationToken _token;
-
-        //TODO: Java version also had inMemoryiaViewRepository - do we need this?
 
         /// <summary>
         /// 
         /// </summary>
         /// <param name="iaViewRepository">Repository from which source Information Asset data is retrieved for subsequent categorisation.</param>
-        /// <param name="categoryRepository">Repository from whihc the list of categories is retrieved (currently Elastic but could be another source type).</param>
+        /// <param name="categoryRepository">Repository from which the list of categories is retrieved (currently Elastic but could be another source type).</param>
         /// <param name="categoriserRepository">The Elastic repository used for categorisation.  If null, then the iaViewRepository is used instead.</param>
         /// <param name="stagingQueue">Queue used to store the results from categorisation i.e. iaid with zero, one or more category IDs.
         /// Currently we're using Active MQ but it could be another queue type.</param>
-        public QueryBasedCategoriserService(IIAViewRepository iaViewRepository, ICategoryRepository categoryRepository, ICategoriserRepository categoriserRepository = null, IUpdateStagingQueueSender stagingQueueSender = null, CancellationToken token = default)
+        public QueryBasedCategoriserService(IIAViewRepository iaViewRepository, ICategoryRepository categoryRepository, ICategoriser categoriserRepository = null, IUpdateStagingQueueSender stagingQueueSender = null, CancellationToken token = default)
         {
             _iaViewRepository = iaViewRepository;
             _categoryRepository = categoryRepository;
-            _categoriserRepository = categoriserRepository;
+            _categoriser = categoriserRepository;
             _stagingQueueSender = stagingQueueSender;
             _token = token;
+
+            var refreshbleCategoryRepo = _categoryRepository as IRefreshableCategoryRepository;
+            if (refreshbleCategoryRepo != null)
+            {
+                refreshbleCategoryRepo.CategoriesRefreshed += OnCategoryRefresh; 
+            }
         }
 
         public async Task<IList<CategorisationResult>> TestCategoriseSingle(string docReference)
@@ -83,7 +87,6 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
-
         public async Task<IList<CategorisationResult>> TestCategoriseSingle(InformationAssetView iaView, bool retrieveScoreForAllRelevantCategories, IList<Category> cachedCategories)
         {
 
@@ -110,9 +113,9 @@ namespace NationalArchives.Taxonomy.Common.Service
 
                 try
                 {
-                    if (_categoriserRepository != null)
+                    if (_categoriser != null)
                     {
-                        listOfCategorisationResults = _categoriserRepository.FindRelevantCategoriesForDocument(iaView, sourceCategories, retrieveScoreForAllRelevantCategories1);
+                        listOfCategorisationResults = _categoriser.FindRelevantCategoriesForDocument(iaView, sourceCategories, retrieveScoreForAllRelevantCategories1);
                     }
                     else
                     {
@@ -128,6 +131,11 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
+        public void OnCategoryRefresh(object sender, EventArgs e)
+        {
+            var refreshableCategoriser = _categoriser as IRefreshableCategoriser;
+            refreshableCategoriser?.Refresh();
+        }
 
         private async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultiple(InformationAssetView[] iaViews, bool retrieveScoreForAllRelevantCategories, IList<Category> cachedCategories)
         {
@@ -144,6 +152,8 @@ namespace NationalArchives.Taxonomy.Common.Service
 
             async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultipleAsync(InformationAssetView[] iaViews1, bool retrieveScoreForAllRelevantCategories1, IList<Category> cachedCategories1)
             {
+                //TODO: Use event handler in _categoryRepository to find out if categories refresh - if so inform _categoriserRepository
+                // so it can rebuild Lucene queries.
                 IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
 
                 // TODO: If we do use CategoryWithElasticQuery as per above, then we will be able to pass this directly, either
@@ -153,9 +163,9 @@ namespace NationalArchives.Taxonomy.Common.Service
 
                 try
                 {
-                   listOfCategorisationResults =  _categoriserRepository.FindRelevantCategoriesForDocuments(iaViews1, sourceCategories, retrieveScoreForAllRelevantCategories1);
+                   listOfCategorisationResults =  _categoriser.FindRelevantCategoriesForDocuments(iaViews1, sourceCategories, retrieveScoreForAllRelevantCategories1);
 
-                    return listOfCategorisationResults;
+                   return listOfCategorisationResults;
                 }
                 catch (Exception e)
                 {

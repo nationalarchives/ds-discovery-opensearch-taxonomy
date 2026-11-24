@@ -16,6 +16,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
         private const int MAX_CATEGORIES = 250;  //TODO: Probably get the count dynamically and cache.
         private static IList<Category> _categories;
 
+        public event EventHandler<EventArgs> CategoriesRefreshed;
+
         public OpenSearchCategoryRepository(IConnectOpenSearch<CategoryFromOpenSearch> openSearchConnection, IMapper mapper) : base(openSearchConnection, mapper)
         {
         }
@@ -108,11 +110,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
         }
 
         public Task<IList<Category>> FindCategories(string searchText)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task RefreshCategories()
         {
             throw new NotImplementedException();
         }

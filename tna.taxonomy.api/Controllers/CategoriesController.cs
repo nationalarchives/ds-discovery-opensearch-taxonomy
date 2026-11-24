@@ -1,11 +1,9 @@
 ﻿using Lucene.Net.Util;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using NationalArchives.Taxonomy.Common;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
-using SharpCompress;
 
 
 namespace tna.taxonomy.api.Controllers
@@ -137,6 +135,32 @@ namespace tna.taxonomy.api.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error updating category {category.Id}");
+                return StatusCode(500);
+            }
+        }
+
+        [Route("Refresh")]
+        [HttpGet]
+        public async Task<ActionResult> RefreshCategoryDefinitions()
+        {
+            try
+            {
+                var refreshableCategoryRepo = _categoryRepository as IRefreshableCategoryRepository;
+
+                if (refreshableCategoryRepo != null)
+                {
+                    await refreshableCategoryRepo.RefreshCategories(); 
+                }
+                else
+                {  
+                    return BadRequest(); 
+                }
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error refreshing category definitions.");
                 return StatusCode(500);
             }
         }
