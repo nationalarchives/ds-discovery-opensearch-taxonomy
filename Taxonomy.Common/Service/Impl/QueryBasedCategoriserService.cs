@@ -20,6 +20,8 @@ namespace NationalArchives.Taxonomy.Common.Service
         private readonly IUpdateStagingQueueSender _stagingQueueSender;
         private readonly CancellationToken _token;
 
+
+
         /// <summary>
         /// 
         /// </summary>
@@ -45,24 +47,7 @@ namespace NationalArchives.Taxonomy.Common.Service
 
         public async Task<IList<CategorisationResult>> TestCategoriseSingle(string docReference)
         {
-            CheckForValidDocReference(docReference);
-
-            try
-            {
-                IList<CategorisationResult> results = await TestCategoriseSingleAsync(docReference);
-                return results;
-            }
-            catch (Exception e)
-            {
-                throw;
-            }
-
-            async Task<IList<CategorisationResult>> TestCategoriseSingleAsync(string docReference1)
-            {
-                InformationAssetView iaView = await _iaViewRepository.SearchDocByDocReference(docReference);
-                IList<CategorisationResult> results1 = await TestCategoriseSingle(iaView, true, null);
-                return results1;
-            }
+            return await TestCategoriseSingle(docReference: docReference, includeScores: true);
         }
 
         public async Task<IList<CategorisationResult>> TestCategoriseSingle(string docReference, bool includeScores)
@@ -105,11 +90,7 @@ namespace NationalArchives.Taxonomy.Common.Service
             async Task<IList<CategorisationResult>> TestCategoriseSingleAsync(InformationAssetView iaView1, bool retrieveScoreForAllRelevantCategories1, IList<Category> cachedCategories1)
             {
                 IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
-
-                // TODO: If we do use CategoryWithElasticQuery as per above, then we will be able to pass this directly, either
-                // via another overload or variance.
                 IList<CategorisationResult> listOfCategorisationResults;
-
 
                 try
                 {
@@ -131,18 +112,11 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
-        public void OnCategoryRefresh(object sender, EventArgs e)
-        {
-            var refreshableCategoriser = _categoriser as IRefreshableCategoriser;
-            refreshableCategoriser?.Refresh();
-        }
-
         private async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultiple(InformationAssetView[] iaViews, bool retrieveScoreForAllRelevantCategories, IList<Category> cachedCategories)
         {
-
             try
             {
-                IDictionary<string, List<CategorisationResult>> results =  await TestCategoriseMultipleAsync(iaViews, retrieveScoreForAllRelevantCategories, cachedCategories);
+                IDictionary<string, List<CategorisationResult>> results = await TestCategoriseMultipleAsync(iaViews, retrieveScoreForAllRelevantCategories, cachedCategories);
                 return results;
             }
             catch (Exception e)
@@ -152,14 +126,8 @@ namespace NationalArchives.Taxonomy.Common.Service
 
             async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultipleAsync(InformationAssetView[] iaViews1, bool retrieveScoreForAllRelevantCategories1, IList<Category> cachedCategories1)
             {
-                //TODO: Use event handler in _categoryRepository to find out if categories refresh - if so inform _categoriserRepository
-                // so it can rebuild Lucene queries.
                 IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
-
-                // TODO: If we do use CategoryWithElasticQuery as per above, then we will be able to pass this directly, either
-                // via another overload or variance.
                 IDictionary<string, List<CategorisationResult>> listOfCategorisationResults;
-
 
                 try
                 {
@@ -173,6 +141,7 @@ namespace NationalArchives.Taxonomy.Common.Service
                 }
             }
         }
+
 
         public Task<IList<CategorisationResult>> CategoriseSingle(string docReference, IList<Category> cachedCategories = null)
         {
@@ -210,8 +179,30 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
+
+        public void OnCategoryRefresh(object sender, EventArgs e)
+        {
+            RefreshCategoriserIfCategoriesUpdated();
+        }
+
+        /// <summary>
+        /// Refreshes the in memory categoriser if the Category definitions on which it depends have been updated, which can occur via a 
+        /// call to the Taxonomy=>RefreshCategories endpoint.  This will cause the category definitions to be reloaded from the database  
+        /// and the Categoriser's Lucene queries to be rebuilt using the updated definitions.
+        /// </summary>
+        private void RefreshCategoriserIfCategoriesUpdated()
+        {
+            var refreshableCategoriser = _categoriser as IRefreshableCategoriser;
+            refreshableCategoriser?.Refresh();
+        }
+
         private void SaveResultsToIntermUpdateQueue(InformationAssetView iaView, IList<CategorisationResult> listOfCategorisationResults)
         {
+            if (_stagingQueueSender == null)
+            {
+                throw new TaxonomyException("Cannot update interim queue as there is no sender.");
+            }
+
             IaidWithCategories iaidWithCategories = new IaidWithCategories(iaView.DocReference, listOfCategorisationResults.Select(r => r.CategoryID).ToList());
             _stagingQueueSender.Enqueue(iaidWithCategories, _token);
         }
@@ -267,11 +258,6 @@ namespace NationalArchives.Taxonomy.Common.Service
             throw new NotImplementedException();
         }
 
-        private void SaveTaxonomiesForInformationAsset(InformationAssetView iaAsset  )
-        {
-
-        }
-
         private void CheckForValidDocReference(string docReference)
         {
             //TODO: Also check regex for expected format?
@@ -301,14 +287,12 @@ namespace NationalArchives.Taxonomy.Common.Service
 
             try
             {
-                //TODO: Possibly fetch multiple assets at once in batch operation.
                 DateTime fetchStart = DateTime.Now;
 
                 IList<InformationAssetView> assets1 = await _iaViewRepository.SearchDocByMultipleDocReferences(docReferences);
 
                 DateTime fetchComplete = DateTime.Now;
                 TimeSpan fetchTime = fetchComplete - fetchStart;
-
 
                 Console.WriteLine($"Fetched {assets1.Count} from Elastic Search for categorising in {Math.Round(fetchTime.TotalSeconds, 5)} seconds");
 

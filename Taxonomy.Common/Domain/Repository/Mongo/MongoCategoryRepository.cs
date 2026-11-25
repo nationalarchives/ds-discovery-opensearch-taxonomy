@@ -90,7 +90,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
                     {
                         if (!forceRefresh)
                         {
-                            _categories = categories; 
+                            _categories = categories;
+                            CategoriesRefreshed?.Invoke(this, new EventArgs());
                         }
                     }
                     else
