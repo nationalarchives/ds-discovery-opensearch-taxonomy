@@ -14,13 +14,16 @@ namespace NationalArchives.Taxonomy.Common.Service
 {
     public class QueryBasedCategoriserService : ICategoriserService<CategorisationResult>
     {
+        #region Private_Members
         private readonly IIAViewRepository _iaViewRepository;
         private readonly ICategoryRepository _categoryRepository;
         private readonly ICategoriser _categoriser;
         private readonly IUpdateStagingQueueSender _stagingQueueSender;
         private readonly CancellationToken _token;
+        #endregion
 
 
+        #region Constructor
 
         /// <summary>
         /// 
@@ -41,10 +44,13 @@ namespace NationalArchives.Taxonomy.Common.Service
             var refreshbleCategoryRepo = _categoryRepository as IRefreshableCategoryRepository;
             if (refreshbleCategoryRepo != null)
             {
-                refreshbleCategoryRepo.CategoriesRefreshed += OnCategoryRefresh; 
+                refreshbleCategoryRepo.CategoriesRefreshed += OnCategoryRefresh;
             }
         }
+        #endregion
 
+        #region Public_Methods
+        #region Public_Methods_Categorise_Single
         public async Task<IList<CategorisationResult>> TestCategoriseSingle(string docReference)
         {
             return await TestCategoriseSingle(docReference: docReference, includeScores: true);
@@ -112,36 +118,6 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
-        private async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultiple(InformationAssetView[] iaViews, bool retrieveScoreForAllRelevantCategories, IList<Category> cachedCategories)
-        {
-            try
-            {
-                IDictionary<string, List<CategorisationResult>> results = await TestCategoriseMultipleAsync(iaViews, retrieveScoreForAllRelevantCategories, cachedCategories);
-                return results;
-            }
-            catch (Exception e)
-            {
-                throw;
-            }
-
-            async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultipleAsync(InformationAssetView[] iaViews1, bool retrieveScoreForAllRelevantCategories1, IList<Category> cachedCategories1)
-            {
-                IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
-                IDictionary<string, List<CategorisationResult>> listOfCategorisationResults;
-
-                try
-                {
-                   listOfCategorisationResults =  _categoriser.FindRelevantCategoriesForDocuments(iaViews1, sourceCategories, retrieveScoreForAllRelevantCategories1);
-
-                   return listOfCategorisationResults;
-                }
-                catch (Exception e)
-                {
-                    throw;
-                }
-            }
-        }
-
 
         public Task<IList<CategorisationResult>> CategoriseSingle(string docReference, IList<Category> cachedCategories = null)
         {
@@ -178,41 +154,67 @@ namespace NationalArchives.Taxonomy.Common.Service
                 throw;
             }
         }
+        #endregion
 
-
-        public void OnCategoryRefresh(object sender, EventArgs e)
+        #region PUblic_Methods_Categorise_Multiple
+        public async Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(string[] docReferences, IList<Category> cachedCategories, bool saveResultsToQueue = true)
         {
-            RefreshCategoriserIfCategoriesUpdated();
-        }
 
-        /// <summary>
-        /// Refreshes the in memory categoriser if the Category definitions on which it depends have been updated, which can occur via a 
-        /// call to the Taxonomy=>RefreshCategories endpoint.  This will cause the category definitions to be reloaded from the database  
-        /// and the Categoriser's Lucene queries to be rebuilt using the updated definitions.
-        /// </summary>
-        private void RefreshCategoriserIfCategoriesUpdated()
-        {
-            var refreshableCategoriser = _categoriser as IRefreshableCategoriser;
-            refreshableCategoriser?.Refresh();
-        }
-
-        private void SaveResultsToIntermUpdateQueue(InformationAssetView iaView, IList<CategorisationResult> listOfCategorisationResults)
-        {
-            if (_stagingQueueSender == null)
+            foreach (string s in docReferences)
             {
-                throw new TaxonomyException("Cannot update interim queue as there is no sender.");
+                CheckForValidDocReference(s);
             }
 
-            IaidWithCategories iaidWithCategories = new IaidWithCategories(iaView.DocReference, listOfCategorisationResults.Select(r => r.CategoryID).ToList());
-            _stagingQueueSender.Enqueue(iaidWithCategories, _token);
+            IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
+
+            try
+            {
+                DateTime fetchStart = DateTime.Now;
+
+                IList<InformationAssetView> assets1 = await _iaViewRepository.SearchDocByMultipleDocReferences(docReferences);
+
+                DateTime fetchComplete = DateTime.Now;
+                TimeSpan fetchTime = fetchComplete - fetchStart;
+
+                Console.WriteLine($"Fetched {assets1.Count} from Elastic Search for categorising in {Math.Round(fetchTime.TotalSeconds, 5)} seconds");
+
+                IDictionary<string, List<CategorisationResult>> listOfCategorisationResultsForAllAssets = await TestCategoriseMultiple(assets1.ToArray(), false, sourceCategories);
+
+                if (saveResultsToQueue)
+                {
+                    foreach (var listOfCategorisationResults in listOfCategorisationResultsForAllAssets)
+                    {
+                        SaveResultsToIntermUpdateQueue(listOfCategorisationResults.Key, listOfCategorisationResults.Value);
+                    }
+                }
+
+                return listOfCategorisationResultsForAllAssets;
+            }
+            catch (Exception e)
+            {
+                throw;
+            }
         }
 
-        private void SaveResultsToIntermUpdateQueue(string iaid, IList<CategorisationResult> listOfCategorisationResults)
+        public async Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(IList<InformationAssetView> assets, IList<Category> cachedCategories)
         {
-            IaidWithCategories iaidWithCategories = new IaidWithCategories(iaid, listOfCategorisationResults.Select(r => r.CategoryID).ToList());
-            _stagingQueueSender.Enqueue(iaidWithCategories, _token);
+
+            IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
+
+            try
+            {
+                IDictionary<string, List<CategorisationResult>> listOfCategorisationResultsForAllAssets = await TestCategoriseMultiple(assets.ToArray(), false, sourceCategories);
+                return listOfCategorisationResultsForAllAssets;
+            }
+            catch (Exception e)
+            {
+                throw;
+            }
         }
 
+        #endregion
+
+        #region Public_Methods_Other
         public IAViewUpdate FindLastIAViewUpdate()
         {
             //TODO: This appears to be querying Mongo and getting back an IAIDs
@@ -243,7 +245,7 @@ namespace NationalArchives.Taxonomy.Common.Service
             // the index to ensure a document is visible on the in memory index after indexing
             // but before we run categorisation.  This is because unlike e.g. SQL server, indexing 
             // does not make the documnent immediately visible;
-            // Currently we're doing a fresh after indexing but before running the categorisation query
+            // Currently we're doing a refresh after indexing but before running the categorisation query
             // This may suffice but need to monitor performance.
             // See IndexDocument method in ElasticConnection.cs
             //
@@ -253,9 +255,76 @@ namespace NationalArchives.Taxonomy.Common.Service
             // doesn't occur until after this call and then it's not being called for each indivivual categorise
             // request, so not clear what's going on..
             //
-            // Possibly ths is a global setting whcih ensures docs are always immediately visible, so we don't need
+            // Possibly ths is a global setting which ensures docs are always immediately visible, so we don't need
             // to call refresh on each one indiviually
             throw new NotImplementedException();
+        }
+
+        public void OnCategoryRefresh(object sender, EventArgs e)
+        {
+            RefreshCategoriserIfCategoriesUpdated();
+        }
+        #endregion
+        #endregion
+
+        #region Private_Methods
+        private async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultiple(InformationAssetView[] iaViews, bool retrieveScoreForAllRelevantCategories, IList<Category> cachedCategories)
+        {
+            try
+            {
+                IDictionary<string, List<CategorisationResult>> results = await TestCategoriseMultipleAsync(iaViews, retrieveScoreForAllRelevantCategories, cachedCategories);
+                return results;
+            }
+            catch (Exception e)
+            {
+                throw;
+            }
+
+            async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultipleAsync(InformationAssetView[] iaViews1, bool retrieveScoreForAllRelevantCategories1, IList<Category> cachedCategories1)
+            {
+                IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
+                IDictionary<string, List<CategorisationResult>> listOfCategorisationResults;
+
+                try
+                {
+                    listOfCategorisationResults = _categoriser.FindRelevantCategoriesForDocuments(iaViews1, sourceCategories, retrieveScoreForAllRelevantCategories1);
+
+                    return listOfCategorisationResults;
+                }
+                catch (Exception e)
+                {
+                    throw;
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// Refreshes the in memory categoriser if the Category definitions on which it depends have been updated, which can occur via a 
+        /// call to the Taxonomy=>RefreshCategories endpoint.  This will cause the category definitions to be reloaded from the database  
+        /// and the Categoriser's Lucene queries to be rebuilt using the updated definitions.
+        /// </summary>
+        private void RefreshCategoriserIfCategoriesUpdated()
+        {
+            var refreshableCategoriser = _categoriser as IRefreshableCategoriser;
+            refreshableCategoriser?.Refresh();
+        }
+
+        private void SaveResultsToIntermUpdateQueue(InformationAssetView iaView, IList<CategorisationResult> listOfCategorisationResults)
+        {
+            if (_stagingQueueSender == null)
+            {
+                throw new TaxonomyException("Cannot update interim queue as there is no sender.");
+            }
+
+            IaidWithCategories iaidWithCategories = new IaidWithCategories(iaView.DocReference, listOfCategorisationResults.Select(r => r.CategoryID).ToList());
+            _stagingQueueSender.Enqueue(iaidWithCategories, _token);
+        }
+
+        private void SaveResultsToIntermUpdateQueue(string iaid, IList<CategorisationResult> listOfCategorisationResults)
+        {
+            IaidWithCategories iaidWithCategories = new IaidWithCategories(iaid, listOfCategorisationResults.Select(r => r.CategoryID).ToList());
+            _stagingQueueSender.Enqueue(iaidWithCategories, _token);
         }
 
         private void CheckForValidDocReference(string docReference)
@@ -269,65 +338,11 @@ namespace NationalArchives.Taxonomy.Common.Service
 
         private void CheckStagingQueue()
         {
-            if(_stagingQueueSender == null)
+            if (_stagingQueueSender == null)
             {
                 throw new TaxonomyException("Cannot categorise this request as Categoriser has no staging queue provided");
             }
         }
-
-        public async Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(string[] docReferences, IList<Category> cachedCategories, bool saveResultsToQueue = true)
-        {
-
-            foreach (string s in docReferences)
-            {
-                CheckForValidDocReference(s);
-            }
-            
-            IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
-
-            try
-            {
-                DateTime fetchStart = DateTime.Now;
-
-                IList<InformationAssetView> assets1 = await _iaViewRepository.SearchDocByMultipleDocReferences(docReferences);
-
-                DateTime fetchComplete = DateTime.Now;
-                TimeSpan fetchTime = fetchComplete - fetchStart;
-
-                Console.WriteLine($"Fetched {assets1.Count} from Elastic Search for categorising in {Math.Round(fetchTime.TotalSeconds, 5)} seconds");
-
-                IDictionary<string, List<CategorisationResult>> listOfCategorisationResultsForAllAssets = await TestCategoriseMultiple(assets1.ToArray(), false, sourceCategories);
-
-                if (saveResultsToQueue)
-                {
-                    foreach (var listOfCategorisationResults in listOfCategorisationResultsForAllAssets)
-                    {
-                        SaveResultsToIntermUpdateQueue(listOfCategorisationResults.Key, listOfCategorisationResults.Value);
-                    } 
-                }
-
-                return listOfCategorisationResultsForAllAssets;
-            }
-            catch (Exception e)
-            {
-                throw;
-            }
-        }
-
-        public async Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(IList<InformationAssetView> assets, IList<Category> cachedCategories)
-        {
-
-            IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
-
-            try
-            {
-                IDictionary<string, List<CategorisationResult>> listOfCategorisationResultsForAllAssets = await TestCategoriseMultiple(assets.ToArray(), false, sourceCategories);
-                return listOfCategorisationResultsForAllAssets;
-            }
-            catch (Exception e)
-            {
-                throw;
-            }
-        }
+        #endregion    
     }
 }
