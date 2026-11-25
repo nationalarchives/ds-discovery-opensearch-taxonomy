@@ -51,6 +51,12 @@ namespace NationalArchives.Taxonomy.Common.Service
 
         #region Public_Methods
         #region Public_Methods_Categorise_Single
+        /// <summary>
+        /// Categorises a document based on the TNA Discovery reference (IAID).
+        /// Delegates to method <c>TestCategoriseSingle(string docReference, bool includeScores)</c>
+        /// </summary>
+        /// <param name="docReference">IAID reference for the document to be classified</param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances</returns>
         public async Task<IList<CategorisationResult>> TestCategoriseSingle(string docReference)
         {
             return await TestCategoriseSingle(docReference: docReference, includeScores: true);
@@ -78,9 +84,21 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
+        /// <summary>
+        /// Categorises an InformationAssetView instance, by calling the categoriser to see which
+        /// (if any) categories it matches.
+        /// All the TestCategoriseSingle and CategoriseSingle overloads ultimately call this method
+        /// to perform the actual categorisation operation.
+        /// </summary>
+        /// <param name="iaView">InformationAssetView instance</param>
+        /// <param name="retrieveScoreForAllRelevantCategories">Whether or not to also retrieve the scores ofr the document against each matched category.</param>
+        /// <param name="cachedCategories">The cached category definitions (from Mongo).  These are passed to the caetgoriser but when
+        /// using the in memory categoriser it will usually already have its own cache and they will only be used to rebuild this if the 
+        /// definitions have changed.
+        /// </param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances</returns>
         public async Task<IList<CategorisationResult>> TestCategoriseSingle(InformationAssetView iaView, bool retrieveScoreForAllRelevantCategories, IList<Category> cachedCategories)
         {
-
             CheckForValidDocReference(iaView?.CatDocRef);
 
             try
@@ -118,6 +136,11 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
+        public Task<IList<CategorisationResult>> CategoriseSingle(string docReference)
+        {
+            CheckForValidDocReference(docReference);
+            return CategoriseSingle(docReference, null);
+        }
 
         public Task<IList<CategorisationResult>> CategoriseSingle(string docReference, IList<Category> cachedCategories = null)
         {
@@ -132,12 +155,6 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
-        public Task<IList<CategorisationResult>> CategoriseSingle(string docReference)
-        {
-            CheckForValidDocReference(docReference);
-            return CategoriseSingle(docReference, null);
-        }
-
         public async Task<IList<CategorisationResult>> CategoriseSingle(InformationAssetView iaView, IList<Category> cachedCategories = null)
         {
             CheckForValidDocReference(iaView.CatDocRef);
@@ -146,7 +163,7 @@ namespace NationalArchives.Taxonomy.Common.Service
             try
             {
                 IList<CategorisationResult> listOfCategorisationResults = await TestCategoriseSingle(iaView, false, cachedCategories);
-                SaveResultsToIntermUpdateQueue(iaView, listOfCategorisationResults);
+                SaveResultsToInterimUpdateQueue(iaView, listOfCategorisationResults);
                 return listOfCategorisationResults;
             }
             catch (Exception e)
@@ -310,7 +327,7 @@ namespace NationalArchives.Taxonomy.Common.Service
             refreshableCategoriser?.Refresh();
         }
 
-        private void SaveResultsToIntermUpdateQueue(InformationAssetView iaView, IList<CategorisationResult> listOfCategorisationResults)
+        private void SaveResultsToInterimUpdateQueue(InformationAssetView iaView, IList<CategorisationResult> listOfCategorisationResults)
         {
             if (_stagingQueueSender == null)
             {
