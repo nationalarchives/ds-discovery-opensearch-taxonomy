@@ -52,8 +52,10 @@ namespace NationalArchives.Taxonomy.Common.Service
         #region Public_Methods
         #region Public_Methods_Categorise_Single
         /// <summary>
-        /// Categorises a document based on the TNA Discovery reference (IAID).
+        /// Categorises a document based on the TNA Discovery reference (IAID), by calling the categoriser to see which
+        /// (if any) categories it matches.
         /// Delegates to method <c>TestCategoriseSingle(string docReference, bool includeScores)</c>
+        /// which in turn delegates to <c>TestCategoriseSingle(string docReference, bool includeScores)</c>
         /// </summary>
         /// <param name="docReference">IAID reference for the document to be classified</param>
         /// <returns>A list of 0, 1 or many CategorisationResult instances</returns>
@@ -62,6 +64,15 @@ namespace NationalArchives.Taxonomy.Common.Service
             return await TestCategoriseSingle(docReference: docReference, includeScores: true);
         }
 
+        /// <summary>
+        /// Categorises a document based on the TNA Discovery reference (IAID), by calling the categoriser to see which
+        /// (if any) categories it matches.
+        /// Delegates to method <c>TestCategoriseSingle(string docReference, bool includeScores)</c> to perform the
+        /// categorisation work.
+        /// </summary>
+        /// <param name="docReference">IAID reference for the document to be classified</param>
+        /// <param name="includeScores">Whether or not to also retrieve the scores for the document against each matched category.</param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances</returns>
         public async Task<IList<CategorisationResult>> TestCategoriseSingle(string docReference, bool includeScores)
         {
             CheckForValidDocReference(docReference);
@@ -91,7 +102,7 @@ namespace NationalArchives.Taxonomy.Common.Service
         /// to perform the actual categorisation operation.
         /// </summary>
         /// <param name="iaView">InformationAssetView instance</param>
-        /// <param name="retrieveScoreForAllRelevantCategories">Whether or not to also retrieve the scores ofr the document against each matched category.</param>
+        /// <param name="retrieveScoreForAllRelevantCategories">Whether or not to also retrieve the scores for the document against each matched category.</param>
         /// <param name="cachedCategories">The cached category definitions (from Mongo).  These are passed to the caetgoriser but when
         /// using the in memory categoriser it will usually already have its own cache and they will only be used to rebuild this if the 
         /// definitions have changed.
@@ -136,12 +147,32 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
+        /// <summary>
+        /// Categorises a document based on the TNA Discovery reference (IAID), by calling the categoriser to see which
+        /// (if any) categories it matches.
+        /// The results are then sent to the interim update queue (if present - it will be when used by the Windows service).
+        /// This method delegates to <c>CategoriseSingle(string docReference, IList<Category> cachedCategories = null)</c>
+        /// which in turn delegates to <c>CategoriseSingle(InformationAssetView iaView, IList<Category> cachedCategories = null)</c>
+        /// to perform the actual work.
+        /// </summary>
+        /// <param name="docReference">IAID reference for the document to be classified</param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances</returns>
         public Task<IList<CategorisationResult>> CategoriseSingle(string docReference)
         {
             CheckForValidDocReference(docReference);
             return CategoriseSingle(docReference, null);
         }
 
+        /// <summary>
+        /// Categorises a document based on the TNA Discovery reference (IAID), by calling the categoriser to see which
+        /// (if any) categories it matches.
+        /// The results are then sent to the interim update queue (if present - it will be when used by the Windows service).
+        /// This method delegates to  <c>CategoriseSingle(InformationAssetView iaView, IList<Category> cachedCategories = null)</c>
+        /// to perform the actual work.
+        /// </summary>
+        /// <param name="docReference">IAID reference for the document to be classified</param>
+        /// <param name="cachedCategories">Cached category definitions if available.  If null they are retrieved from the category repo.</param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances.</returns>
         public Task<IList<CategorisationResult>> CategoriseSingle(string docReference, IList<Category> cachedCategories = null)
         {
             CheckForValidDocReference(docReference);
@@ -155,6 +186,15 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
+        /// <summary>
+        /// Categorises an InformationAssetView instance, by calling the categoriser to see which (if any) categories it matches.
+        /// The results are then sent to the interim update queue (if present - it will be when used by the Windows service).
+        /// This method delegates to  <c>TestCategoriseSingle(InformationAssetView iaView, bool retrieveScoreForAllRelevantCategories, IList<Category> cachedCategories)</c>
+        /// to perform the actual categorisation work, and then saves the results to the interm queue.
+        /// </summary>
+        /// <param name="iaView">InformationAssetView instance</param>
+        /// <param name="cachedCategories">Cached category definitions if available.  If null they are retrieved from the category repo.</param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances.</returns>
         public async Task<IList<CategorisationResult>> CategoriseSingle(InformationAssetView iaView, IList<Category> cachedCategories = null)
         {
             CheckForValidDocReference(iaView.CatDocRef);
@@ -277,6 +317,12 @@ namespace NationalArchives.Taxonomy.Common.Service
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// Subscribed to event in ICategoryRepository.  This gets raised when the category definitions are updated, so we
+        /// can notifiy the categoriser instance to rebuild the internal Lucene queries.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         public void OnCategoryRefresh(object sender, EventArgs e)
         {
             RefreshCategoriserIfCategoriesUpdated();
@@ -327,17 +373,26 @@ namespace NationalArchives.Taxonomy.Common.Service
             refreshableCategoriser?.Refresh();
         }
 
+        /// <summary>
+        /// Saves categorisation results retrieved during the CategoriseSingle overloads to the interim internal
+        /// update queue (IUpdateStagingQueueSender instance) for onward transmission to an external SQS queue.
+        /// </summary>
+        /// <param name="iaView">InformationAssetView instance</param>
+        /// <param name="listOfCategorisationResults">List of 0,1 or more CategorisationResult</param>
+        /// <exception cref="TaxonomyException"></exception>
         private void SaveResultsToInterimUpdateQueue(InformationAssetView iaView, IList<CategorisationResult> listOfCategorisationResults)
         {
-            if (_stagingQueueSender == null)
-            {
-                throw new TaxonomyException("Cannot update interim queue as there is no sender.");
-            }
-
             IaidWithCategories iaidWithCategories = new IaidWithCategories(iaView.DocReference, listOfCategorisationResults.Select(r => r.CategoryID).ToList());
             _stagingQueueSender.Enqueue(iaidWithCategories, _token);
         }
 
+        /// <summary>
+        /// Saves categorisation results retrieved during the CategoriseSingle overloads to the interim internal
+        /// update queue (IUpdateStagingQueueSender instance) for onward transmission to an external SQS queue.
+        /// </summary>
+        /// <param name="iaid">IAID reference for the document to which the Categorisation results relate.</param>
+        /// <param name="listOfCategorisationResults">List of 0,1 or more CategorisationResult</param>
+        /// <exception cref="TaxonomyException"></exception>
         private void SaveResultsToIntermUpdateQueue(string iaid, IList<CategorisationResult> listOfCategorisationResults)
         {
             IaidWithCategories iaidWithCategories = new IaidWithCategories(iaid, listOfCategorisationResults.Select(r => r.CategoryID).ToList());
