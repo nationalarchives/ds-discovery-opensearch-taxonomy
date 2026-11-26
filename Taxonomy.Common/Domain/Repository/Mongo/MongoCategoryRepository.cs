@@ -11,7 +11,7 @@ using System.Threading;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
 {
-    public sealed class MongoCategoryRepository : ICategoryRepository, IDisposable
+    public sealed class MongoCategoryRepository : ICategoryRepository, IRefreshableCategoryRepository, IDisposable
     {
         private static IList<Category> _categories;
         private readonly IMapper _mapper;
@@ -19,6 +19,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
         private IMongoCollection<CategoryFromMongo> m_MongoCollection = null;
 
         private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
+
+        public event EventHandler<EventArgs> CategoriesRefreshed;
 
         public MongoCategoryRepository(MongoConnectionParams mongoConnectionParams, IMapper mapper)
         {
@@ -88,7 +90,8 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
                     {
                         if (!forceRefresh)
                         {
-                            _categories = categories; 
+                            _categories = categories;
+                            CategoriesRefreshed?.Invoke(this, new EventArgs());
                         }
                     }
                     else
@@ -187,6 +190,13 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
         public void Dispose()
         {
             _semaphore?.Dispose();
+        }
+
+        public Task RefreshCategories()
+        {
+            _categories = null;
+            CategoriesRefreshed?.Invoke(this, new EventArgs());
+            return Task.CompletedTask;
         }
     }
 }

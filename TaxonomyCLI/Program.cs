@@ -105,7 +105,7 @@ namespace NationalArchives.Taxonomy.CLI
 
             services.AddSingleton<DiscoveryOpenSearchConnectionParameters>(config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>());
             services.AddSingleton<CategoryDataOpenSearchConnectionParameters>(config.GetSection("CategoryOpenSearchParams").Get<CategoryDataOpenSearchConnectionParameters>());
-            services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
+            services.AddSingleton(typeof(ILogger<ICategoriser>), typeof(Logger<InMemoryCategoriser>));
 
             services.AddTransient<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) =>
             {
@@ -189,13 +189,13 @@ namespace NationalArchives.Taxonomy.CLI
 
             LuceneHelperTools.ConfigureLuceneServices(categoriserLuceneParams, services);
 
-            services.AddTransient<ICategoriserRepository>((ctx) =>
+            services.AddTransient<ICategoriser>((ctx) =>
             {
                 //TODO: Further testing on  setting - so far we seem to get better performance with false!
                 var analyser = ctx.GetRequiredService<Analyzer>();
                 var luceneHelperTools = ctx.GetRequiredService<LuceneHelperTools>();
-                var logger = ctx.GetRequiredService<ILogger<ICategoriserRepository>>();
-                InMemoryCategoriserRepository categoriserRepo = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyser, luceneHelperTools: luceneHelperTools, logger: logger);
+                var logger = ctx.GetRequiredService<ILogger<ICategoriser>>();
+                InMemoryCategoriser categoriserRepo = new InMemoryCategoriser(iaViewIndexAnalyser: analyser, luceneHelperTools: luceneHelperTools, logger: logger);
                 return categoriserRepo;
             });
 
@@ -204,7 +204,7 @@ namespace NationalArchives.Taxonomy.CLI
                 ICategoryRepository categeoryRepo = ctx.GetRequiredService<ICategoryRepository>();
                 IIAViewRepository iaViewRepository = ctx.GetRequiredService<IIAViewRepository>();
                 IUpdateStagingQueueSender stagingQueueSender = hasLiveUpdates ? ctx.GetRequiredService<IUpdateStagingQueueSender>() : null;
-                ICategoriserRepository categoriserRepo = ctx.GetRequiredService<ICategoriserRepository>();
+                ICategoriser categoriserRepo = ctx.GetRequiredService<ICategoriser>();
                 return new QueryBasedCategoriserService
                 (   
                     iaViewRepository: iaViewRepository, 

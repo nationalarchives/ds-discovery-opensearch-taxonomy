@@ -14,53 +14,65 @@ namespace NationalArchives.Taxonomy.Common.Service
 {
     public class QueryBasedCategoriserService : ICategoriserService<CategorisationResult>
     {
+        #region Private_Members
         private readonly IIAViewRepository _iaViewRepository;
         private readonly ICategoryRepository _categoryRepository;
-        private readonly ICategoriserRepository _categoriserRepository;
+        private readonly ICategoriser _categoriser;
         private readonly IUpdateStagingQueueSender _stagingQueueSender;
         private readonly CancellationToken _token;
+        #endregion
 
-        //TODO: Java version also had inMemoryiaViewRepository - do we need this?
+
+        #region Constructor
 
         /// <summary>
         /// 
         /// </summary>
         /// <param name="iaViewRepository">Repository from which source Information Asset data is retrieved for subsequent categorisation.</param>
-        /// <param name="categoryRepository">Repository from whihc the list of categories is retrieved (currently Elastic but could be another source type).</param>
+        /// <param name="categoryRepository">Repository from which the list of categories is retrieved (currently Elastic but could be another source type).</param>
         /// <param name="categoriserRepository">The Elastic repository used for categorisation.  If null, then the iaViewRepository is used instead.</param>
         /// <param name="stagingQueue">Queue used to store the results from categorisation i.e. iaid with zero, one or more category IDs.
         /// Currently we're using Active MQ but it could be another queue type.</param>
-        public QueryBasedCategoriserService(IIAViewRepository iaViewRepository, ICategoryRepository categoryRepository, ICategoriserRepository categoriserRepository = null, IUpdateStagingQueueSender stagingQueueSender = null, CancellationToken token = default)
+        public QueryBasedCategoriserService(IIAViewRepository iaViewRepository, ICategoryRepository categoryRepository, ICategoriser categoriserRepository = null, IUpdateStagingQueueSender stagingQueueSender = null, CancellationToken token = default)
         {
             _iaViewRepository = iaViewRepository;
             _categoryRepository = categoryRepository;
-            _categoriserRepository = categoriserRepository;
+            _categoriser = categoriserRepository;
             _stagingQueueSender = stagingQueueSender;
             _token = token;
-        }
 
+            var refreshbleCategoryRepo = _categoryRepository as IRefreshableCategoryRepository;
+            if (refreshbleCategoryRepo != null)
+            {
+                refreshbleCategoryRepo.CategoriesRefreshed += OnCategoryRefresh;
+            }
+        }
+        #endregion
+
+        #region Public_Methods
+        #region Public_Methods_Categorise_Single
+        /// <summary>
+        /// Categorises a document based on the TNA Discovery reference (IAID), by calling the categoriser to see which
+        /// (if any) categories it matches.
+        /// Delegates to method <c>TestCategoriseSingle(string docReference, bool includeScores)</c>
+        /// which in turn delegates to <c>TestCategoriseSingle(string docReference, bool includeScores)</c>
+        /// </summary>
+        /// <param name="docReference">IAID reference for the document to be classified</param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances</returns>
         public async Task<IList<CategorisationResult>> TestCategoriseSingle(string docReference)
         {
-            CheckForValidDocReference(docReference);
-
-            try
-            {
-                IList<CategorisationResult> results = await TestCategoriseSingleAsync(docReference);
-                return results;
-            }
-            catch (Exception e)
-            {
-                throw;
-            }
-
-            async Task<IList<CategorisationResult>> TestCategoriseSingleAsync(string docReference1)
-            {
-                InformationAssetView iaView = await _iaViewRepository.SearchDocByDocReference(docReference);
-                IList<CategorisationResult> results1 = await TestCategoriseSingle(iaView, true, null);
-                return results1;
-            }
+            return await TestCategoriseSingle(docReference: docReference, includeScores: true);
         }
 
+        /// <summary>
+        /// Categorises a document based on the TNA Discovery reference (IAID), by calling the categoriser to see which
+        /// (if any) categories it matches.
+        /// Delegates to method <c>TestCategoriseSingle(string docReference, bool includeScores)</c> to perform the
+        /// categorisation work.
+        /// </summary>
+        /// <param name="docReference">IAID reference for the document to be classified</param>
+        /// <param name="includeScores">Whether or not to also retrieve the scores for the document against each matched category.</param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances</returns>
         public async Task<IList<CategorisationResult>> TestCategoriseSingle(string docReference, bool includeScores)
         {
             CheckForValidDocReference(docReference);
@@ -83,10 +95,21 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
-
+        /// <summary>
+        /// Categorises an InformationAssetView instance, by calling the categoriser to see which
+        /// (if any) categories it matches.
+        /// All the TestCategoriseSingle and CategoriseSingle overloads ultimately call this method
+        /// to perform the actual categorisation operation.
+        /// </summary>
+        /// <param name="iaView">InformationAssetView instance</param>
+        /// <param name="retrieveScoreForAllRelevantCategories">Whether or not to also retrieve the scores for the document against each matched category.</param>
+        /// <param name="cachedCategories">The cached category definitions (from Mongo).  These are passed to the caetgoriser but when
+        /// using the in memory categoriser it will usually already have its own cache and they will only be used to rebuild this if the 
+        /// definitions have changed.
+        /// </param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances</returns>
         public async Task<IList<CategorisationResult>> TestCategoriseSingle(InformationAssetView iaView, bool retrieveScoreForAllRelevantCategories, IList<Category> cachedCategories)
         {
-
             CheckForValidDocReference(iaView?.CatDocRef);
 
             try
@@ -102,17 +125,13 @@ namespace NationalArchives.Taxonomy.Common.Service
             async Task<IList<CategorisationResult>> TestCategoriseSingleAsync(InformationAssetView iaView1, bool retrieveScoreForAllRelevantCategories1, IList<Category> cachedCategories1)
             {
                 IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
-
-                // TODO: If we do use CategoryWithElasticQuery as per above, then we will be able to pass this directly, either
-                // via another overload or variance.
                 IList<CategorisationResult> listOfCategorisationResults;
-
 
                 try
                 {
-                    if (_categoriserRepository != null)
+                    if (_categoriser != null)
                     {
-                        listOfCategorisationResults = _categoriserRepository.FindRelevantCategoriesForDocument(iaView, sourceCategories, retrieveScoreForAllRelevantCategories1);
+                        listOfCategorisationResults = _categoriser.FindRelevantCategoriesForDocument(iaView, sourceCategories, retrieveScoreForAllRelevantCategories1);
                     }
                     else
                     {
@@ -128,42 +147,32 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
-
-        private async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultiple(InformationAssetView[] iaViews, bool retrieveScoreForAllRelevantCategories, IList<Category> cachedCategories)
+        /// <summary>
+        /// Categorises a document based on the TNA Discovery reference (IAID), by calling the categoriser to see which
+        /// (if any) categories it matches.
+        /// The results are then sent to the interim update queue (if present - it will be when used by the Windows service).
+        /// This method delegates to <c>CategoriseSingle(string docReference, IList<Category> cachedCategories = null)</c>
+        /// which in turn delegates to <c>CategoriseSingle(InformationAssetView iaView, IList<Category> cachedCategories = null)</c>
+        /// to perform the actual work.
+        /// </summary>
+        /// <param name="docReference">IAID reference for the document to be classified</param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances</returns>
+        public Task<IList<CategorisationResult>> CategoriseSingle(string docReference)
         {
-
-            try
-            {
-                IDictionary<string, List<CategorisationResult>> results =  await TestCategoriseMultipleAsync(iaViews, retrieveScoreForAllRelevantCategories, cachedCategories);
-                return results;
-            }
-            catch (Exception e)
-            {
-                throw;
-            }
-
-            async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultipleAsync(InformationAssetView[] iaViews1, bool retrieveScoreForAllRelevantCategories1, IList<Category> cachedCategories1)
-            {
-                IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
-
-                // TODO: If we do use CategoryWithElasticQuery as per above, then we will be able to pass this directly, either
-                // via another overload or variance.
-                IDictionary<string, List<CategorisationResult>> listOfCategorisationResults;
-
-
-                try
-                {
-                   listOfCategorisationResults =  _categoriserRepository.FindRelevantCategoriesForDocuments(iaViews1, sourceCategories, retrieveScoreForAllRelevantCategories1);
-
-                    return listOfCategorisationResults;
-                }
-                catch (Exception e)
-                {
-                    throw;
-                }
-            }
+            CheckForValidDocReference(docReference);
+            return CategoriseSingle(docReference, null);
         }
 
+        /// <summary>
+        /// Categorises a document based on the TNA Discovery reference (IAID), by calling the categoriser to see which
+        /// (if any) categories it matches.
+        /// The results are then sent to the interim update queue (if present - it will be when used by the Windows service).
+        /// This method delegates to  <c>CategoriseSingle(InformationAssetView iaView, IList<Category> cachedCategories = null)</c>
+        /// to perform the actual work.
+        /// </summary>
+        /// <param name="docReference">IAID reference for the document to be classified</param>
+        /// <param name="cachedCategories">Cached category definitions if available.  If null they are retrieved from the category repo.</param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances.</returns>
         public Task<IList<CategorisationResult>> CategoriseSingle(string docReference, IList<Category> cachedCategories = null)
         {
             CheckForValidDocReference(docReference);
@@ -177,12 +186,15 @@ namespace NationalArchives.Taxonomy.Common.Service
             }
         }
 
-        public Task<IList<CategorisationResult>> CategoriseSingle(string docReference)
-        {
-            CheckForValidDocReference(docReference);
-            return CategoriseSingle(docReference, null);
-        }
-
+        /// <summary>
+        /// Categorises an InformationAssetView instance, by calling the categoriser to see which (if any) categories it matches.
+        /// The results are then sent to the interim update queue (if present - it will be when used by the Windows service).
+        /// This method delegates to  <c>TestCategoriseSingle(InformationAssetView iaView, bool retrieveScoreForAllRelevantCategories, IList<Category> cachedCategories)</c>
+        /// to perform the actual categorisation work, and then saves the results to the interm queue.
+        /// </summary>
+        /// <param name="iaView">InformationAssetView instance</param>
+        /// <param name="cachedCategories">Cached category definitions if available.  If null they are retrieved from the category repo.</param>
+        /// <returns>A list of 0, 1 or many CategorisationResult instances.</returns>
         public async Task<IList<CategorisationResult>> CategoriseSingle(InformationAssetView iaView, IList<Category> cachedCategories = null)
         {
             CheckForValidDocReference(iaView.CatDocRef);
@@ -191,7 +203,7 @@ namespace NationalArchives.Taxonomy.Common.Service
             try
             {
                 IList<CategorisationResult> listOfCategorisationResults = await TestCategoriseSingle(iaView, false, cachedCategories);
-                SaveResultsToIntermUpdateQueue(iaView, listOfCategorisationResults);
+                SaveResultsToInterimUpdateQueue(iaView, listOfCategorisationResults);
                 return listOfCategorisationResults;
             }
             catch (Exception e)
@@ -199,19 +211,67 @@ namespace NationalArchives.Taxonomy.Common.Service
                 throw;
             }
         }
+        #endregion
 
-        private void SaveResultsToIntermUpdateQueue(InformationAssetView iaView, IList<CategorisationResult> listOfCategorisationResults)
+        #region PUblic_Methods_Categorise_Multiple
+        public async Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(string[] docReferences, IList<Category> cachedCategories, bool saveResultsToQueue = true)
         {
-            IaidWithCategories iaidWithCategories = new IaidWithCategories(iaView.DocReference, listOfCategorisationResults.Select(r => r.CategoryID).ToList());
-            _stagingQueueSender.Enqueue(iaidWithCategories, _token);
+
+            foreach (string s in docReferences)
+            {
+                CheckForValidDocReference(s);
+            }
+
+            IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
+
+            try
+            {
+                DateTime fetchStart = DateTime.Now;
+
+                IList<InformationAssetView> assets1 = await _iaViewRepository.SearchDocByMultipleDocReferences(docReferences);
+
+                DateTime fetchComplete = DateTime.Now;
+                TimeSpan fetchTime = fetchComplete - fetchStart;
+
+                Console.WriteLine($"Fetched {assets1.Count} from Elastic Search for categorising in {Math.Round(fetchTime.TotalSeconds, 5)} seconds");
+
+                IDictionary<string, List<CategorisationResult>> listOfCategorisationResultsForAllAssets = await TestCategoriseMultiple(assets1.ToArray(), false, sourceCategories);
+
+                if (saveResultsToQueue)
+                {
+                    foreach (var listOfCategorisationResults in listOfCategorisationResultsForAllAssets)
+                    {
+                        SaveResultsToIntermUpdateQueue(listOfCategorisationResults.Key, listOfCategorisationResults.Value);
+                    }
+                }
+
+                return listOfCategorisationResultsForAllAssets;
+            }
+            catch (Exception e)
+            {
+                throw;
+            }
         }
 
-        private void SaveResultsToIntermUpdateQueue(string iaid, IList<CategorisationResult> listOfCategorisationResults)
+        public async Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(IList<InformationAssetView> assets, IList<Category> cachedCategories)
         {
-            IaidWithCategories iaidWithCategories = new IaidWithCategories(iaid, listOfCategorisationResults.Select(r => r.CategoryID).ToList());
-            _stagingQueueSender.Enqueue(iaidWithCategories, _token);
+
+            IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
+
+            try
+            {
+                IDictionary<string, List<CategorisationResult>> listOfCategorisationResultsForAllAssets = await TestCategoriseMultiple(assets.ToArray(), false, sourceCategories);
+                return listOfCategorisationResultsForAllAssets;
+            }
+            catch (Exception e)
+            {
+                throw;
+            }
         }
 
+        #endregion
+
+        #region Public_Methods_Other
         public IAViewUpdate FindLastIAViewUpdate()
         {
             //TODO: This appears to be querying Mongo and getting back an IAIDs
@@ -242,7 +302,7 @@ namespace NationalArchives.Taxonomy.Common.Service
             // the index to ensure a document is visible on the in memory index after indexing
             // but before we run categorisation.  This is because unlike e.g. SQL server, indexing 
             // does not make the documnent immediately visible;
-            // Currently we're doing a fresh after indexing but before running the categorisation query
+            // Currently we're doing a refresh after indexing but before running the categorisation query
             // This may suffice but need to monitor performance.
             // See IndexDocument method in ElasticConnection.cs
             //
@@ -252,14 +312,91 @@ namespace NationalArchives.Taxonomy.Common.Service
             // doesn't occur until after this call and then it's not being called for each indivivual categorise
             // request, so not clear what's going on..
             //
-            // Possibly ths is a global setting whcih ensures docs are always immediately visible, so we don't need
+            // Possibly ths is a global setting which ensures docs are always immediately visible, so we don't need
             // to call refresh on each one indiviually
             throw new NotImplementedException();
         }
 
-        private void SaveTaxonomiesForInformationAsset(InformationAssetView iaAsset  )
+        /// <summary>
+        /// Subscribed to event in ICategoryRepository.  This gets raised when the category definitions are updated, so we
+        /// can notifiy the categoriser instance to rebuild the internal Lucene queries.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        public void OnCategoryRefresh(object sender, EventArgs e)
         {
+            RefreshCategoriserIfCategoriesUpdated();
+        }
+        #endregion
+        #endregion
 
+        #region Private_Methods
+        private async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultiple(InformationAssetView[] iaViews, bool retrieveScoreForAllRelevantCategories, IList<Category> cachedCategories)
+        {
+            try
+            {
+                IDictionary<string, List<CategorisationResult>> results = await TestCategoriseMultipleAsync(iaViews, retrieveScoreForAllRelevantCategories, cachedCategories);
+                return results;
+            }
+            catch (Exception e)
+            {
+                throw;
+            }
+
+            async Task<IDictionary<string, List<CategorisationResult>>> TestCategoriseMultipleAsync(InformationAssetView[] iaViews1, bool retrieveScoreForAllRelevantCategories1, IList<Category> cachedCategories1)
+            {
+                IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
+                IDictionary<string, List<CategorisationResult>> listOfCategorisationResults;
+
+                try
+                {
+                    listOfCategorisationResults = _categoriser.FindRelevantCategoriesForDocuments(iaViews1, sourceCategories, retrieveScoreForAllRelevantCategories1);
+
+                    return listOfCategorisationResults;
+                }
+                catch (Exception e)
+                {
+                    throw;
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// Refreshes the in memory categoriser if the Category definitions on which it depends have been updated, which can occur via a 
+        /// call to the Taxonomy=>RefreshCategories endpoint.  This will cause the category definitions to be reloaded from the database  
+        /// and the Categoriser's Lucene queries to be rebuilt using the updated definitions.
+        /// </summary>
+        private void RefreshCategoriserIfCategoriesUpdated()
+        {
+            var refreshableCategoriser = _categoriser as IRefreshableCategoriser;
+            refreshableCategoriser?.Refresh();
+        }
+
+        /// <summary>
+        /// Saves categorisation results retrieved during the CategoriseSingle overloads to the interim internal
+        /// update queue (IUpdateStagingQueueSender instance) for onward transmission to an external SQS queue.
+        /// </summary>
+        /// <param name="iaView">InformationAssetView instance</param>
+        /// <param name="listOfCategorisationResults">List of 0,1 or more CategorisationResult</param>
+        /// <exception cref="TaxonomyException"></exception>
+        private void SaveResultsToInterimUpdateQueue(InformationAssetView iaView, IList<CategorisationResult> listOfCategorisationResults)
+        {
+            IaidWithCategories iaidWithCategories = new IaidWithCategories(iaView.DocReference, listOfCategorisationResults.Select(r => r.CategoryID).ToList());
+            _stagingQueueSender.Enqueue(iaidWithCategories, _token);
+        }
+
+        /// <summary>
+        /// Saves categorisation results retrieved during the CategoriseSingle overloads to the interim internal
+        /// update queue (IUpdateStagingQueueSender instance) for onward transmission to an external SQS queue.
+        /// </summary>
+        /// <param name="iaid">IAID reference for the document to which the Categorisation results relate.</param>
+        /// <param name="listOfCategorisationResults">List of 0,1 or more CategorisationResult</param>
+        /// <exception cref="TaxonomyException"></exception>
+        private void SaveResultsToIntermUpdateQueue(string iaid, IList<CategorisationResult> listOfCategorisationResults)
+        {
+            IaidWithCategories iaidWithCategories = new IaidWithCategories(iaid, listOfCategorisationResults.Select(r => r.CategoryID).ToList());
+            _stagingQueueSender.Enqueue(iaidWithCategories, _token);
         }
 
         private void CheckForValidDocReference(string docReference)
@@ -273,67 +410,11 @@ namespace NationalArchives.Taxonomy.Common.Service
 
         private void CheckStagingQueue()
         {
-            if(_stagingQueueSender == null)
+            if (_stagingQueueSender == null)
             {
                 throw new TaxonomyException("Cannot categorise this request as Categoriser has no staging queue provided");
             }
         }
-
-        public async Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(string[] docReferences, IList<Category> cachedCategories, bool saveResultsToQueue = true)
-        {
-
-            foreach (string s in docReferences)
-            {
-                CheckForValidDocReference(s);
-            }
-            
-            IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
-
-            try
-            {
-                //TODO: Possibly fetch multiple assets at once in batch operation.
-                DateTime fetchStart = DateTime.Now;
-
-                IList<InformationAssetView> assets1 = await _iaViewRepository.SearchDocByMultipleDocReferences(docReferences);
-
-                DateTime fetchComplete = DateTime.Now;
-                TimeSpan fetchTime = fetchComplete - fetchStart;
-
-
-                Console.WriteLine($"Fetched {assets1.Count} from Elastic Search for categorising in {Math.Round(fetchTime.TotalSeconds, 5)} seconds");
-
-                IDictionary<string, List<CategorisationResult>> listOfCategorisationResultsForAllAssets = await TestCategoriseMultiple(assets1.ToArray(), false, sourceCategories);
-
-                if (saveResultsToQueue)
-                {
-                    foreach (var listOfCategorisationResults in listOfCategorisationResultsForAllAssets)
-                    {
-                        SaveResultsToIntermUpdateQueue(listOfCategorisationResults.Key, listOfCategorisationResults.Value);
-                    } 
-                }
-
-                return listOfCategorisationResultsForAllAssets;
-            }
-            catch (Exception e)
-            {
-                throw;
-            }
-        }
-
-        public async Task<IDictionary<string, List<CategorisationResult>>> CategoriseMultiple(IList<InformationAssetView> assets, IList<Category> cachedCategories)
-        {
-
-            IList<Category> sourceCategories = cachedCategories ?? await _categoryRepository.FindAll();
-
-            try
-            {
-                IDictionary<string, List<CategorisationResult>> listOfCategorisationResultsForAllAssets = await TestCategoriseMultiple(assets.ToArray(), false, sourceCategories);
-                return listOfCategorisationResultsForAllAssets;
-            }
-            catch (Exception e)
-            {
-                throw;
-            }
-        }
+        #endregion    
     }
 }

@@ -1,8 +1,6 @@
 ﻿using NationalArchives.Taxonomy.Common.BusinessObjects;
-using NationalArchives.Taxonomy.Common.Domain.Repository.Mongo;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Repository.Common
@@ -41,5 +39,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Common
         void Save(Category category);
         Category AddNewCategory(string title, string query, double score = 0);
         Task<IList<Category>> FindCategories(string searchText);
+    }
+
+    public interface IRefreshableCategoryRepository
+    {
+        Task RefreshCategories();
+        event EventHandler<EventArgs> CategoriesRefreshed;
     }
 }

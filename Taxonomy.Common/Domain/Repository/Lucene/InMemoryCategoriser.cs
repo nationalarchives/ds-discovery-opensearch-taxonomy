@@ -1,37 +1,38 @@
 ﻿
-using ln = Lucene.Net;
 using Lucene.Net.Analysis;
 using Lucene.Net.Documents;
 using Lucene.Net.Index;
-using lns = Lucene.Net.Search;
 using Lucene.Net.Store;
+using Microsoft.Extensions.Logging;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
+using ln = Lucene.Net;
+using lns = Lucene.Net.Search;
 using lnu = Lucene.Net.Util;
-using Microsoft.Extensions.Logging;
-using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
 {
-    public class InMemoryCategoriserRepository : ICategoriserRepository
+    public class InMemoryCategoriser : ICategoriser, IRefreshableCategoriser
     {
 
+        #region private_vars
         private readonly Analyzer _iaViewIndexAnalyser;
         private readonly lnu.LuceneVersion _luceneVersion = lnu.LuceneVersion.LUCENE_CURRENT;
         private readonly LuceneHelperTools _luceneHelperTools;
         private uint _batchSize;
-        private ILogger<ICategoriserRepository> _logger;
-
+        private ILogger<ICategoriser> _logger; 
         private static IList<CategoryWithLuceneQuery> _categoriesWithLuceneQueries;
+        #endregion
 
-        public InMemoryCategoriserRepository(Analyzer iaViewIndexAnalyser, LuceneHelperTools luceneHelperTools, ILogger<ICategoriserRepository> logger, uint batchSize = 1000)
+        #region public_methods
+        public InMemoryCategoriser(Analyzer iaViewIndexAnalyser, LuceneHelperTools luceneHelperTools, ILogger<ICategoriser> logger, uint batchSize = 1000)
         {
-            if(iaViewIndexAnalyser == null || luceneHelperTools == null)
+            if (iaViewIndexAnalyser == null || luceneHelperTools == null)
             {
                 throw new Exception("Analyser and Lucene Helper tools are required!");
             }
@@ -42,52 +43,105 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
             _logger = logger;
         }
 
+        public IDictionary<string, List<CategorisationResult>> FindRelevantCategoriesForDocuments(InformationAssetView[] iaViews, IEnumerable<Category> sourceCategories, bool includeScores = false)
+        {
+            IList<CategoryWithLuceneQuery> categoriesWithLuceneQueries = GetCategoriesWithParsedQueries(sourceCategories);
+            return FindRelevantCategoriesForDocuments(iaViews, categoriesWithLuceneQueries, includeScores);
+        }
+
         public IList<CategorisationResult> FindRelevantCategoriesForDocument(InformationAssetView iaView, IEnumerable<Category> categoriesToCheck, bool includeScores = false)
         {
             IList<CategoryWithLuceneQuery> categoriesWithQuery = _categoriesWithLuceneQueries ?? GetCategoriesWithParsedQueries(categoriesToCheck);
             return FindRelevantCategoriesForDocument(iaView, categoriesWithQuery, includeScores);
         }
 
-
-        /// <summary>
-        /// TODO: Possibly just query on the category, if we can be sure that the index only has the one
-        /// document./  This is what the Java code does.  Check performance and review.
-        /// </summary>
-        /// <param name="searcher"></param>
-        /// <param name="categoryWithIdQuery"></param>
-        /// <returns></returns>
-        private bool IsMatch(lns.IndexSearcher searcher,  lns.BooleanQuery booleanQuery)
+        private IList<CategorisationResult> FindRelevantCategoriesForDocument(InformationAssetView iaView, IList<CategoryWithLuceneQuery> sourceCategories, bool includeScores = false)
         {
-            var hits = searcher.Search(booleanQuery, 1);
-            return (hits.TotalHits > 0);
+            IList<CategorisationResult> categorisationResults = new List<CategorisationResult>();
+
+            lns.SearcherManager searcherManager = null;   // org.apache.lucene.search;
+            lns.IndexSearcher searcher = null;   //org.apache.lucene.store;
+            RAMDirectory ramDirectory = null;  //org.apache.lucene.store;
+
+            try
+            {
+                ramDirectory = CreateRamDirectoryForDocument(iaView);  //org.apache.lucene.store;
+                searcherManager = new lns.SearcherManager(ramDirectory, null);   //org.apache.lucene.search;
+                searcher = searcherManager.Acquire(); //org.apache.lucene.store;
+
+                // Run all the categories against the in memory doc?  But why are we starting out with
+                var luceneHelperTools = _luceneHelperTools ?? new LuceneHelperTools();
+
+                Dictionary<string, lns.BooleanQuery> categoryIdsWithBooleanQueries =
+                    sourceCategories.ToDictionary(c => c.Id, c => luceneHelperTools.BuildBooleanQuery(iaView, c.ParsedQuery));
+
+                Dictionary<string, lns.Query> categoryQueries = sourceCategories.ToDictionary(c => c.Id, c => c.ParsedQuery);
+
+                var queriesToUse = new Dictionary<string, lns.Query>();
+
+                foreach (var item in categoryIdsWithBooleanQueries)
+                {
+                    queriesToUse.Add(item.Key, item.Value);
+                }
+
+                if (includeScores)
+                {
+                    foreach (var query in queriesToUse)
+                    {
+                        double? score;
+                        bool isMatch = IsMatch(searcher, query.Value, out score);
+                        if (isMatch)
+                        {
+                            Category category = sourceCategories.Single(c => c.Id == query.Key).Category;
+                            categorisationResults.Add(new CategorisationResult(category, score));
+                        }
+                    }
+                }
+                else
+                {
+
+                    var matchingQueries = queriesToUse.Where(bq => IsMatch(searcher, bq.Value));
+                    matchingQueries.ToList().ForEach(q =>
+                    {
+                        Category category = sourceCategories.Single(c => c.Id == q.Key).Category;
+                        categorisationResults.Add(new CategorisationResult(category, null));
+                    }
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new TaxonomyException(TaxonomyErrorType.LUCENE_IO_EXCEPTION, ex);
+            }
+            finally
+            {
+                LuceneHelperTools.ReleaseSearcherManagerQuietly(searcherManager, searcher);
+                LuceneHelperTools.DisposeQuietly(ramDirectory);
+            }
+
+            Trace.WriteLine(categorisationResults.Count + " matching categories.");
+            Debug.Print(categorisationResults.Count + " matching categories.");
+            return categorisationResults;
         }
 
+        public void Refresh()
+        {
+            _categoriesWithLuceneQueries = null;
+        }
+        #endregion
+
+        #region private_methods
         private bool IsMatch(lns.IndexSearcher searcher, lns.Query query)
         {
             var hits = searcher.Search(query, 1);
             return (hits.TotalHits > 0);
         }
 
-        private bool IsMatch(lns.IndexSearcher searcher, lns.BooleanQuery booleanQuery, out double? score)
-        {
-            var hits = searcher.Search(booleanQuery, (int)_batchSize).ScoreDocs;
-            if(hits.Count() > 0)
-            {
-                score = hits[0].Score;
-                return true;
-            }
-            else
-            {
-                score = null;
-                return false;
-            }
-        }
-
         private string[] MatchingIaids(lns.IndexSearcher searcher, lns.Query query)
         {
             lns.ScoreDoc[] scoreDocs = searcher.Search(query, (int)_batchSize).ScoreDocs;
 
-            if(scoreDocs.Count() == 0)
+            if (scoreDocs.Count() == 0)
             {
                 return new string[0];
             }
@@ -117,7 +171,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                 results.Add(new Tuple<string, double>(iaid, score));
             }
             return results;
-            
+
         }
 
 
@@ -137,75 +191,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
             }
         }
 
-        public IList<CategorisationResult> FindRelevantCategoriesForDocument(InformationAssetView iaView, IList<CategoryWithLuceneQuery> sourceCategories, bool includeScores = false)
-        {
-            IList<CategorisationResult> categorisationResults = new List<CategorisationResult>();
-
-            lns.SearcherManager searcherManager = null;   // org.apache.lucene.search;
-            lns.IndexSearcher searcher = null;   //org.apache.lucene.store;
-            RAMDirectory ramDirectory = null;  //org.apache.lucene.store;
-
-            try
-            {
-                ramDirectory = CreateRamDirectoryForDocument(iaView);  //org.apache.lucene.store;
-                searcherManager = new lns.SearcherManager(ramDirectory, null);   //org.apache.lucene.search;
-                searcher = searcherManager.Acquire(); //org.apache.lucene.store;
-
-                // Run all the categories against the in memory doc?  But why are we starting out with
-                    var luceneHelperTools =  _luceneHelperTools ?? new LuceneHelperTools();
-
-                Dictionary<string, lns.BooleanQuery> categoryIdsWithBooleanQueries =
-                    sourceCategories.ToDictionary(c => c.Id, c => luceneHelperTools.BuildBooleanQuery(iaView, c.ParsedQuery));
-
-                Dictionary<string, lns.Query> categoryQueries = sourceCategories.ToDictionary(c => c.Id, c => c.ParsedQuery);
-
-                var queriesToUse = new Dictionary<string, lns.Query>();
-
-                foreach(var item in categoryIdsWithBooleanQueries)
-                {
-                    queriesToUse.Add(item.Key, item.Value);
-                }
-
-                if (includeScores)
-                {
-                    foreach(var query in queriesToUse)
-                    {
-                        double? score;
-                        bool isMatch = IsMatch(searcher, query.Value, out score);
-                        if (isMatch)
-                        {
-                            Category category = sourceCategories.Single(c => c.Id == query.Key).Category;
-                            categorisationResults.Add(new CategorisationResult(category, score));
-                        }
-                    }
-                }
-                else
-                {
-
-                    var matchingQueries = queriesToUse.Where(bq => IsMatch(searcher, bq.Value));
-                    matchingQueries.ToList().ForEach(q =>
-                        {
-                            Category category = sourceCategories.Single(c => c.Id == q.Key).Category;
-                            categorisationResults.Add(new CategorisationResult(category, null));
-                        }
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new TaxonomyException(TaxonomyErrorType.LUCENE_IO_EXCEPTION, ex);
-            }
-            finally
-            {
-                LuceneHelperTools.ReleaseSearcherManagerQuietly(searcherManager, searcher);
-                LuceneHelperTools.DisposeQuietly(ramDirectory);
-            }
-
-            Trace.WriteLine(categorisationResults.Count + " matching categories.");
-            Debug.Print(categorisationResults.Count + " matching categories.");
-		    return categorisationResults;
-        }
-
         private Document GetLuceneDocumentFromIaView(InformationAssetView iaView, bool storeIdField = false)
         {
 
@@ -214,7 +199,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
 
             listOfFields.Add(new StringField("id", iaView.DocReference.ToLowerInvariant(), storeIdField ? Field.Store.YES : Field.Store.NO));
 
-            switch(_iaViewIndexAnalyser)
+            switch (_iaViewIndexAnalyser)
             {
                 case IAViewTextNoCasNoPuncAnalyser tncnp:
                     listOfFields.AddRange(GetCopyIAViewFieldsToTaxonomyField(iaView, OpenSearchFieldConstants.TEXT_NO_CAS_NO_PUNC));
@@ -262,7 +247,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
 
             List<Field> listOfFields = new List<Field>();
 
-            string[] queryFields =_luceneHelperTools.QueryFields.ToArray();
+            string[] queryFields = _luceneHelperTools.QueryFields.ToArray();
 
 
 
@@ -276,14 +261,14 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
             {
                 listOfFields.Add(new TextField(targetCommonIndexField, iaView.ContextDescription, Field.Store.NO));
             }
-            if (iaView.CorpBodys != null  && iaView.CorpBodys.Length > 0 && queryFields.Contains(OpenSearchFieldConstants.CORPORATE_BODY, StringComparer.OrdinalIgnoreCase))
+            if (iaView.CorpBodys != null && iaView.CorpBodys.Length > 0 && queryFields.Contains(OpenSearchFieldConstants.CORPORATE_BODY, StringComparer.OrdinalIgnoreCase))
             {
                 foreach (string corpBody in iaView.CorpBodys)
                 {
                     listOfFields.Add(new TextField(targetCommonIndexField, corpBody, Field.Store.NO));
                 }
             }
-            if (iaView.Subjects != null  && iaView.Subjects.Length > 0 && queryFields.Contains(OpenSearchFieldConstants.SUBJECT, StringComparer.OrdinalIgnoreCase))
+            if (iaView.Subjects != null && iaView.Subjects.Length > 0 && queryFields.Contains(OpenSearchFieldConstants.SUBJECT, StringComparer.OrdinalIgnoreCase))
             {
                 foreach (string subject in iaView.Subjects)
                 {
@@ -337,7 +322,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
         private IList<CategoryWithLuceneQuery> GetCategoriesWithParsedQueries(IEnumerable<Category> categories)
         {
 
-            if(_categoriesWithLuceneQueries != null)
+            if (_categoriesWithLuceneQueries != null)
             {
                 return _categoriesWithLuceneQueries;
             }
@@ -355,17 +340,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                 catch (Exception e)
                 {
                     Console.WriteLine("Unable to parse query: " + c.Id);
-                    throw new TaxonomyException(TaxonomyErrorType.INVALID_CATEGORY_QUERY,$"Unable to parse query: {c.Id}, {c.Title}", e);
+                    throw new TaxonomyException(TaxonomyErrorType.INVALID_CATEGORY_QUERY, $"Unable to parse query: {c.Id}, {c.Title}", e);
                 }
             }
             _categoriesWithLuceneQueries = categoriesWithluceneQueries;
             return categoriesWithluceneQueries;
-        }
-
-        public IDictionary<string, List<CategorisationResult>> FindRelevantCategoriesForDocuments(InformationAssetView[] iaViews, IEnumerable<Category> sourceCategories, bool includeScores = false)
-        {
-            IList<CategoryWithLuceneQuery> categoriesWithLuceneQueries = GetCategoriesWithParsedQueries(sourceCategories);
-            return FindRelevantCategoriesForDocuments(iaViews, categoriesWithLuceneQueries, includeScores);
         }
 
         private IDictionary<string, List<CategorisationResult>> FindRelevantCategoriesForDocuments(InformationAssetView[] iaViews, IEnumerable<CategoryWithLuceneQuery> sourceCategories, bool includeScores = false)
@@ -374,7 +353,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
             var categorisationResults = new Dictionary<string, List<CategorisationResult>>(StringComparer.OrdinalIgnoreCase);
 
             //Seed the dictionary so we have a key for each IAID that could potentially match 1 or more categories.
-            foreach(InformationAssetView iaView in iaViews)
+            foreach (InformationAssetView iaView in iaViews)
             {
                 try
                 {
@@ -384,7 +363,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                     }
                     else
                     {
-                        categorisationResults.Add(iaView.DocReference, new List<CategorisationResult>()); 
+                        categorisationResults.Add(iaView.DocReference, new List<CategorisationResult>());
                     }
                 }
                 catch (ArgumentException aex)
@@ -453,11 +432,6 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
 
         }
 
-        private string[] GetDocReferencesForBatch(InformationAssetView[] iaViews)
-        {
-            return iaViews.Select(i => i.DocReference).Where(r => !String.IsNullOrEmpty(r)).ToArray();
-        }
-
         private RAMDirectory CreateRamDirectoryForDocument(InformationAssetView iaView)
         {
             RAMDirectory ramDirectory = new RAMDirectory();  //org.apache.lucene.store
@@ -491,15 +465,15 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Lucene
                 foreach (InformationAssetView iaView in iaViews)
                 {
                     // Add some Document objects containing quotes
-                    Document document = GetLuceneDocumentFromIaView(iaView,storeIdField: true);
+                    Document document = GetLuceneDocumentFromIaView(iaView, storeIdField: true);
                     writer.AddDocument(document);
                 }
             }
 
             // Optimize and close the writer to finish building the index
             return ramDirectory;
-
-        }
+        } 
+        #endregion
     }
 }
 

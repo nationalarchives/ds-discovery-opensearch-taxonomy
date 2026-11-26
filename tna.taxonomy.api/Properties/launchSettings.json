@@ -5,7 +5,10 @@
       "launchBrowser": true,
       "launchUrl": "swagger",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "CategoryMongo_DatabaseName": "taxonomy",
+        "CategoryMongo_CollectionName": "categories",
+        "CategoryMongo_ConnectionString": "mongodb://localhost:27017/admin?readPreference=primary"
       },
       "dotnetRunMessages": true,
       "applicationUrl": "http://localhost:5114"

@@ -18,7 +18,7 @@ string autoMapperLicenseKey = Environment.GetEnvironmentVariable("AutoMapperLice
 builder.Services.AddAutoMapper(cfg => { cfg.AddMaps(new[] { "NationalArchives.Taxonomy.Common" }); cfg.LicenseKey = autoMapperLicenseKey; });
 
 builder.Services.AddSingleton(config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>());
-builder.Services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
+builder.Services.AddSingleton(typeof(ILogger<ICategoriser>), typeof(Logger<InMemoryCategoriser>));
 
 builder.Services.AddScoped<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) =>
 {
@@ -94,12 +94,12 @@ builder.Services.AddTransient<IInformationAssetViewService>((ctx) =>
 
 LuceneHelperTools.ConfigureLuceneServices(categoriserLuceneParams, builder.Services);
 
-builder.Services.AddTransient<ICategoriserRepository>((ctx) =>
+builder.Services.AddTransient<ICategoriser>((ctx) =>
 {
     var analyser = ctx.GetRequiredService<Analyzer>();
     var luceneHelperTools = ctx.GetRequiredService<LuceneHelperTools>();
-    var logger = ctx.GetRequiredService<ILogger<ICategoriserRepository>>();
-    InMemoryCategoriserRepository categoriserRepo = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyser, luceneHelperTools: luceneHelperTools, logger: logger);
+    var logger = ctx.GetRequiredService<ILogger<ICategoriser>>();
+    InMemoryCategoriser categoriserRepo = new InMemoryCategoriser(iaViewIndexAnalyser: analyser, luceneHelperTools: luceneHelperTools, logger: logger);
     return categoriserRepo;
 });
 
@@ -107,7 +107,7 @@ builder.Services.AddTransient<ICategoriserService<CategorisationResult>>((ctx) =
 {
     ICategoryRepository categeoryRepo = ctx.GetRequiredService<ICategoryRepository>();
     IIAViewRepository iaViewRepository = ctx.GetRequiredService<IIAViewRepository>();
-    ICategoriserRepository categoriserRepository = ctx.GetRequiredService<ICategoriserRepository>();
+    ICategoriser categoriserRepository = ctx.GetRequiredService<ICategoriser>();
     return new QueryBasedCategoriserService(iaViewRepository: iaViewRepository, categoryRepository: categeoryRepo, categoriserRepository: categoriserRepository);
 });
 

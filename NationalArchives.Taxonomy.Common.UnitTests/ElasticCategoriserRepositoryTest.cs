@@ -48,7 +48,7 @@ namespace NationalArchives.Taxonomy.Common.UnitTests
 
             var luceneHelperTools = new LuceneHelperTools(defaultField, analyzer, _queryFields);
 
-            var openSearchCategoryRepository = new InMemoryCategoriserRepository(iaViewIndexAnalyser :analyzer, luceneHelperTools: luceneHelperTools, logger: null);
+            var openSearchCategoryRepository = new InMemoryCategoriser(iaViewIndexAnalyser :analyzer, luceneHelperTools: luceneHelperTools, logger: null);
 
             InformationAssetView iaView = GetInformationAssetView();
 
@@ -69,7 +69,7 @@ namespace NationalArchives.Taxonomy.Common.UnitTests
 
             var luceneHelperTools = new LuceneHelperTools(defaultField, analyzer, _queryFields);
 
-            var openSearchCategoryRepository = new InMemoryCategoriserRepository( analyzer, luceneHelperTools: luceneHelperTools, logger: null);
+            var openSearchCategoryRepository = new InMemoryCategoriser( analyzer, luceneHelperTools: luceneHelperTools, logger: null);
 
             InformationAssetView iaView = GetInformationAssetView();
 
@@ -93,7 +93,7 @@ namespace NationalArchives.Taxonomy.Common.UnitTests
 
             var luceneHelperTools = new LuceneHelperTools(defaultField, analyzer, _queryFields);
 
-            var openSearchCategoryRepository = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyzer, luceneHelperTools: luceneHelperTools, logger: null);
+            var openSearchCategoryRepository = new InMemoryCategoriser(iaViewIndexAnalyser: analyzer, luceneHelperTools: luceneHelperTools, logger: null);
 
             InformationAssetView iaView = GetInformationAssetView();
 
@@ -117,7 +117,7 @@ namespace NationalArchives.Taxonomy.Common.UnitTests
 
                 var luceneHelperTools = new LuceneHelperTools(defaultField, analyzer, _queryFields);
 
-                var openSearchCategoryRepository = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyzer, luceneHelperTools: luceneHelperTools, logger: null);
+                var openSearchCategoryRepository = new InMemoryCategoriser(iaViewIndexAnalyser: analyzer, luceneHelperTools: luceneHelperTools, logger: null);
 
                 InformationAssetView iaView = GetInformationAssetView();
 

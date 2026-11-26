@@ -113,7 +113,7 @@ namespace NationalArchives.Taxonomy.Batch
             services.AddSingleton(typeof(ILogger<Program>), typeof(Logger<Program>));
 
             services.AddSingleton(typeof(ILogger<Analyzer>), typeof(Logger<Analyzer>));
-            services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
+            services.AddSingleton(typeof(ILogger<ICategoriser>), typeof(Logger<InMemoryCategoriser>));
   
             DiscoveryOpenSearchConnectionParameters discoveryOpenSearchConnParams = config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>();
            
@@ -182,12 +182,12 @@ namespace NationalArchives.Taxonomy.Batch
             }
 
 
-            services.AddTransient<ICategoriserRepository>((ctx) =>
+            services.AddTransient<ICategoriser>((ctx) =>
             {
                 var analyser = ctx.GetRequiredService<Analyzer>();
                 var luceneHelperTools = ctx.GetRequiredService<LuceneHelperTools>();
-                var logger = ctx.GetRequiredService<ILogger<ICategoriserRepository>>();
-                InMemoryCategoriserRepository categoriserRepo = new InMemoryCategoriserRepository(iaViewIndexAnalyser: analyser, luceneHelperTools: luceneHelperTools, logger: logger, batchSize: categorisationParams.BatchSize);
+                var logger = ctx.GetRequiredService<ILogger<ICategoriser>>();
+                InMemoryCategoriser categoriserRepo = new InMemoryCategoriser(iaViewIndexAnalyser: analyser, luceneHelperTools: luceneHelperTools, logger: logger, batchSize: categorisationParams.BatchSize);
                 return categoriserRepo; 
             });
 
@@ -224,7 +224,7 @@ namespace NationalArchives.Taxonomy.Batch
             {
                 ICategoryRepository categeoryRepo = ctx.GetRequiredService<ICategoryRepository>(); // source repo for list of categories.
                 IIAViewRepository iaViewRepository = ctx.GetRequiredService<IIAViewRepository>();  // source repo for information assets.
-                ICategoriserRepository categoriserRepo = ctx.GetRequiredService<ICategoriserRepository>();
+                ICategoriser categoriserRepo = ctx.GetRequiredService<ICategoriser>();
                 IUpdateStagingQueueSender stagingQueueSender = ctx.GetRequiredService<IUpdateStagingQueueSender>();
                 
                 return new QueryBasedCategoriserService(iaViewRepository, categeoryRepo, categoriserRepo, stagingQueueSender);
