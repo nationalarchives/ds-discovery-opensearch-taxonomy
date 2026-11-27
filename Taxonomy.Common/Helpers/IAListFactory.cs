@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain;
+using NationalArchives.Taxonomy.Common.Mappers;
 using OpenSearch.Client;
 
 //using Nest;
@@ -12,10 +13,10 @@ namespace NationalArchives.Taxonomy.Common.Helpers
     {
         private ISearchResponse<TInput> _searchResponse;
 
-        private IMapper _mapper;
+        private IMapper<TInput, TOutput> _mapper;
 
 
-        public IAListFactory(ISearchResponse<TInput> searchResponse, IMapper mapper)
+        public IAListFactory(ISearchResponse<TInput> searchResponse, IMapper<TInput, TOutput> mapper)
         {
             _searchResponse = searchResponse;
             _mapper = mapper;
@@ -29,7 +30,7 @@ namespace NationalArchives.Taxonomy.Common.Helpers
             foreach (var item in _searchResponse.Hits)
             {
                 TInput searchResult = item.Source;
-                var result = _mapper.Map<TOutput>(searchResult);
+                var result = _mapper.MapFrom(searchResult);
                 result.Score = item.Score.HasValue ? (double)item.Score : 0;
 
                 assets.Add(result);

@@ -6,7 +6,7 @@ using System.Text;
 namespace NationalArchives.Taxonomy.Common.DataObjects.Mongo
 {
     [BsonIgnoreExtraElements]
-    internal sealed class CategoryFromMongo
+    public sealed class CategoryFromMongo
     {
         [BsonElement("TAXONOMY_ID")]
         public string CIAID { get; set; }

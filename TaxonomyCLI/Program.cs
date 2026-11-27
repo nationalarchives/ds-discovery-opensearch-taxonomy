@@ -1,24 +1,20 @@
-﻿using AutoMapper;
-using Lucene.Net.Analysis;
-using Lucene.Net.Analysis.Core;
-using Lucene.Net.Analysis.Miscellaneous;
-using Lucene.Net.Analysis.Standard;
-using Lucene.Net.Analysis.Synonym;
-using Lucene.Net.Util;
+﻿using Lucene.Net.Analysis;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
+using NationalArchives.Taxonomy.Common.DataObjects.Mongo;
 using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
+using NationalArchives.Taxonomy.Common.Domain;
 using NationalArchives.Taxonomy.Common.Domain.Queue;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
-using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Lucene;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Mongo;
+using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
+using NationalArchives.Taxonomy.Common.Mappers;
 using NationalArchives.Taxonomy.Common.Service;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -107,6 +103,12 @@ namespace NationalArchives.Taxonomy.CLI
             services.AddSingleton<CategoryDataOpenSearchConnectionParameters>(config.GetSection("CategoryOpenSearchParams").Get<CategoryDataOpenSearchConnectionParameters>());
             services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
 
+            services.AddTransient(typeof(IMapper<OpenSearchRecordAssetView, InformationAssetView>), typeof(OpenSearchRecordAssetViewToInformationAssetViewMapper));
+            services.AddTransient(typeof(IMapper<InformationAssetView, OpenSearchRecordAssetView>), typeof(InformationAssetViewOpenSearchRecordAssetViewMapper));
+            services.AddTransient(typeof(IMapper<OpenSearchRecordAssetView, InformationAssetViewWithScore>), typeof(OpenSearchRecordAssetViewToInformationAssetViewWithScoreMapper));
+            services.AddTransient(typeof(IMapper<CategoryFromOpenSearch, Category>), typeof(CategoryFromOpenSearchToCategoryMapper));
+            services.AddTransient(typeof(IMapper<CategoryFromMongo, Category>), typeof(CategoryFromMongoToCategoryMapper));
+
             services.AddTransient<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) =>
             {
                 OpenSearchConnectionParameters cparams = ctx.GetRequiredService<DiscoveryOpenSearchConnectionParameters>();
@@ -116,10 +118,14 @@ namespace NationalArchives.Taxonomy.CLI
 
             services.AddTransient<IIAViewRepository>((ctx) =>
             {
-                IMapper mapper = ctx.GetRequiredService<IMapper>();
+                IMapper<OpenSearchRecordAssetView, InformationAssetView> osRecAssetViewToInfoAssetViewMapper = ctx.GetRequiredService<IMapper<OpenSearchRecordAssetView, InformationAssetView>>();
+                IMapper<InformationAssetView, OpenSearchRecordAssetView> infoAssetViewToOsRecAssetViewMapper = ctx.GetRequiredService<IMapper<InformationAssetView, OpenSearchRecordAssetView>>();
+                IMapper<OpenSearchRecordAssetView, InformationAssetViewWithScore> infoAssetViewToOsRecAssetViewScoreMapper = ctx.GetRequiredService<IMapper<OpenSearchRecordAssetView, InformationAssetViewWithScore>>();
+
                 IConnectOpenSearch<OpenSearchRecordAssetView> elasticConnectionInfo = ctx.GetRequiredService<IConnectOpenSearch<OpenSearchRecordAssetView>>();
                 LuceneHelperTools luceneHelperTools = ctx.GetRequiredService<LuceneHelperTools>();
-                OpenSearchIAViewRepository iaRepo = new OpenSearchIAViewRepository(elasticConnectionInfo, luceneHelperTools, mapper);
+                OpenSearchIAViewRepository iaRepo = new OpenSearchIAViewRepository(elasticConnectionInfo, luceneHelperTools, osRecAssetViewToInfoAssetViewMapper,
+                    infoAssetViewToOsRecAssetViewMapper, infoAssetViewToOsRecAssetViewScoreMapper);
                 return iaRepo;
             });
 
@@ -140,7 +146,7 @@ namespace NationalArchives.Taxonomy.CLI
                     // category list repo using category connection info.
                     services.AddTransient<ICategoryRepository, OpenSearchCategoryRepository>((ctx) =>
                     {
-                        IMapper mapper = ctx.GetRequiredService<IMapper>();
+                        IMapper<CategoryFromOpenSearch, Category> mapper = ctx.GetRequiredService<IMapper<CategoryFromOpenSearch, Category>>();
                         IConnectOpenSearch<CategoryFromOpenSearch> elasticConnectionInfo = ctx.GetRequiredService<IConnectOpenSearch<CategoryFromOpenSearch>>();
                         OpenSearchCategoryRepository categoryRepo = new OpenSearchCategoryRepository(elasticConnectionInfo, mapper);
                         return categoryRepo;
@@ -152,7 +158,7 @@ namespace NationalArchives.Taxonomy.CLI
                     //Mongo categories
                     services.AddTransient<ICategoryRepository, MongoCategoryRepository>((ctx) =>
                     {
-                        IMapper mapper = ctx.GetRequiredService<IMapper>();
+                        IMapper<CategoryFromMongo, Category> mapper = ctx.GetRequiredService<IMapper<CategoryFromMongo, Category>>();
                         MongoConnectionParams categoryDataMongoConnParams = config.GetSection("CategoryMongoParams").Get<MongoConnectionParams>();
                         MongoCategoryRepository categoryRepo = new MongoCategoryRepository(categoryDataMongoConnParams, mapper);
                         return categoryRepo;

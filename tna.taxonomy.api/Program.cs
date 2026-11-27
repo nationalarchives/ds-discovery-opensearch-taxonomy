@@ -2,11 +2,14 @@ using AutoMapper;
 using Lucene.Net.Analysis;
 using Microsoft.OpenApi;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
+using NationalArchives.Taxonomy.Common.DataObjects.Mongo;
 using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
+using NationalArchives.Taxonomy.Common.Domain;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Lucene;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Mongo;
 using NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch;
+using NationalArchives.Taxonomy.Common.Mappers;
 using NationalArchives.Taxonomy.Common.Service;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +22,13 @@ builder.Services.AddAutoMapper(cfg => { cfg.AddMaps(new[] { "NationalArchives.Ta
 
 builder.Services.AddSingleton(config.GetSection("DiscoveryOpenSearchParams").Get<DiscoveryOpenSearchConnectionParameters>());
 builder.Services.AddSingleton(typeof(ILogger<ICategoriserRepository>), typeof(Logger<InMemoryCategoriserRepository>));
+
+builder.Services.AddTransient(typeof(IMapper<CategoryFromOpenSearch, Category>), typeof(CategoryFromOpenSearchToCategoryMapper));
+builder.Services.AddTransient(typeof(IMapper<CategoryFromMongo, Category>), typeof(CategoryFromMongoToCategoryMapper));
+builder.Services.AddTransient(typeof(IMapper<OpenSearchRecordAssetView, InformationAssetView>), typeof(OpenSearchRecordAssetViewToInformationAssetViewMapper));
+builder.Services.AddTransient(typeof(IMapper<InformationAssetView, OpenSearchRecordAssetView>), typeof(InformationAssetViewOpenSearchRecordAssetViewMapper));
+builder.Services.AddTransient(typeof(IMapper<OpenSearchRecordAssetView, InformationAssetViewWithScore>), typeof(OpenSearchRecordAssetViewToInformationAssetViewWithScoreMapper));
+
 
 builder.Services.AddScoped<IConnectOpenSearch<OpenSearchRecordAssetView>>((ctx) =>
 {
@@ -44,7 +54,7 @@ switch (categorySource)
         // category list repo using category connection info.
         builder.Services.AddTransient<ICategoryRepository, OpenSearchCategoryRepository>((ctx) =>
         {
-            IMapper mapper = ctx.GetRequiredService<IMapper>();
+            IMapper<CategoryFromOpenSearch, Category> mapper = ctx.GetRequiredService<IMapper<CategoryFromOpenSearch, Category>>();
             IConnectOpenSearch<CategoryFromOpenSearch> elasticConnectionInfo = ctx.GetRequiredService<IConnectOpenSearch<CategoryFromOpenSearch>>();
             OpenSearchCategoryRepository categoryRepo = new OpenSearchCategoryRepository(elasticConnectionInfo, mapper);
             return categoryRepo;
@@ -56,7 +66,7 @@ switch (categorySource)
         //Mongo categories
         builder.Services.AddTransient<ICategoryRepository, MongoCategoryRepository>((ctx) =>
         {
-            IMapper mapper = ctx.GetRequiredService<IMapper>();
+            IMapper<CategoryFromMongo, Category> mapper = ctx.GetRequiredService<IMapper<CategoryFromMongo, Category>>();
             MongoConnectionParams categoryDataMongoConnParams = new MongoConnectionParams
             {
                 ConnectionString = Environment.GetEnvironmentVariable("CategoryMongo_ConnectionString"),
@@ -78,10 +88,15 @@ CategoriserLuceneParams categoriserLuceneParams = config.GetSection("Categoriser
 // and still inject via DI?
 builder.Services.AddTransient<IIAViewRepository>((ctx) =>
 {
-    IMapper mapper = ctx.GetRequiredService<IMapper>();
+    IMapper<OpenSearchRecordAssetView, InformationAssetView> osRecAssetViewToInfoAssetViewMapper = ctx.GetRequiredService<IMapper<OpenSearchRecordAssetView, InformationAssetView>>();
+    IMapper<InformationAssetView, OpenSearchRecordAssetView> infoAssetViewToOsRecAssetViewMapper = ctx.GetRequiredService<IMapper<InformationAssetView, OpenSearchRecordAssetView>>();
+    IMapper<OpenSearchRecordAssetView, InformationAssetViewWithScore> infoAssetViewToOsRecAssetViewScoreMapper = ctx.GetRequiredService<IMapper<OpenSearchRecordAssetView, InformationAssetViewWithScore>>();
+
     IConnectOpenSearch<OpenSearchRecordAssetView> elasticConnectionInfo = ctx.GetRequiredService<IConnectOpenSearch<OpenSearchRecordAssetView>>();
     LuceneHelperTools luceneHelperTools = ctx.GetRequiredService<LuceneHelperTools>();
-    OpenSearchIAViewRepository iaRepo = new OpenSearchIAViewRepository(elasticConnectionInfo, luceneHelperTools, mapper);
+    OpenSearchIAViewRepository iaRepo = new OpenSearchIAViewRepository(elasticConnectionInfo, luceneHelperTools, 
+        osRecAssetViewToInfoAssetViewMapper, infoAssetViewToOsRecAssetViewMapper, infoAssetViewToOsRecAssetViewScoreMapper);
+
     return iaRepo;
 });
 

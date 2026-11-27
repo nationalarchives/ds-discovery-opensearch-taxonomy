@@ -1,7 +1,7 @@
-﻿using AutoMapper;
-using NationalArchives.Taxonomy.Common.BusinessObjects;
+﻿using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
+using NationalArchives.Taxonomy.Common.Mappers;
 using OpenSearch.Client;
 using System;
 using System.Collections.Generic;
@@ -15,9 +15,11 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
     {
         private const int MAX_CATEGORIES = 250;  //TODO: Probably get the count dynamically and cache.
         private static IList<Category> _categories;
+        private readonly IMapper<CategoryFromOpenSearch, Category> _categoryMapper;
 
-        public OpenSearchCategoryRepository(IConnectOpenSearch<CategoryFromOpenSearch> openSearchConnection, IMapper mapper) : base(openSearchConnection, mapper)
+        public OpenSearchCategoryRepository(IConnectOpenSearch<CategoryFromOpenSearch> openSearchConnection, IMapper<CategoryFromOpenSearch, Category> categoryMapper) : base(openSearchConnection)
         {
+            _categoryMapper = categoryMapper;
         }
 
         public Category AddNewCategory(string title, string query, double score = 0)
@@ -55,7 +57,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
                 foreach (var item in openSearchCategories.Hits)
                 {
                     CategoryFromOpenSearch searchResult = item.Source;
-                    var result = _mapper.Map<Category>(searchResult);
+                    var result = _categoryMapper.MapFrom(searchResult);
                     result.Score = item.Score.HasValue ? (double)item.Score : 0;
 
                     categories.Add(result);

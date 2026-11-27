@@ -1,9 +1,10 @@
 ﻿using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
+using OpenSearch.Client;
 using System;
 
 namespace NationalArchives.Taxonomy.Common.Domain
 {
-    public class InformationAssetView // : ISearchResult
+    public class InformationAssetView
     {
         //TODO: Property names ported from Java App (only capitalisation changed)
         //- do they need to (or can they) change for Elastic?
@@ -25,6 +26,27 @@ namespace NationalArchives.Taxonomy.Common.Domain
 
     public class InformationAssetViewWithScore : InformationAssetView, ISearchResult
     {
+        public InformationAssetViewWithScore()
+        {
+        }
+
+        public InformationAssetViewWithScore(InformationAssetView infoAssetView)
+        {
+            this.CatDocRef = infoAssetView.CatDocRef;
+            this.ContextDescription = infoAssetView.ContextDescription;
+            this.CorpBodys = infoAssetView.CorpBodys;
+            this.CoveringDates = infoAssetView.CoveringDates;
+            this.Description = infoAssetView.Description;
+            this.DocReference = infoAssetView.DocReference;
+            this.NUM_END_DATE = infoAssetView.NUM_END_DATE;
+            this.NUM_START_DATE = infoAssetView.NUM_START_DATE;
+            this.Person_FullName = infoAssetView.Person_FullName;
+            this.Place_Name = infoAssetView.Place_Name;
+            this.Series = infoAssetView.Series;
+            this.Source = infoAssetView.Source;
+            this.Subjects = infoAssetView.Subjects;
+            this.Title = infoAssetView.Title;
+        }
         public double Score { get; set; }
     }
 }

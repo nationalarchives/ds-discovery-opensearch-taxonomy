@@ -1,28 +1,29 @@
-﻿using AutoMapper;
-using MongoDB.Driver;
+﻿using MongoDB.Driver;
 using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.DataObjects.Mongo;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
+using NationalArchives.Taxonomy.Common.Mappers;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
 {
     public sealed class MongoCategoryRepository : ICategoryRepository, IDisposable
     {
         private static IList<Category> _categories;
-        private readonly IMapper _mapper;
+
+        private readonly IMapper<CategoryFromMongo, Category> _catFromMongoToCatMapper;
 
         private IMongoCollection<CategoryFromMongo> m_MongoCollection = null;
 
         private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
 
-        public MongoCategoryRepository(MongoConnectionParams mongoConnectionParams, IMapper mapper)
+        public MongoCategoryRepository(MongoConnectionParams mongoConnectionParams, IMapper<CategoryFromMongo, Category> catFromMongoToCatMapper)
         {
-            _mapper = mapper;
+            _catFromMongoToCatMapper = catFromMongoToCatMapper;
             try
             {
                 string connectionString = mongoConnectionParams.ConnectionString;
@@ -70,7 +71,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
                             IEnumerable<CategoryFromMongo> batch = mongoCategoriesCursor.Current;
                             foreach (CategoryFromMongo mongoCategory in batch)
                             {
-                                Category category = _mapper.Map<Category>(mongoCategory);
+                                Category category = _catFromMongoToCatMapper.MapFrom(mongoCategory);
 
                                 foreach (string s in new string[] { category.Id, category.Query, category.Title })
                                 {
@@ -121,7 +122,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
             var filter = $"{{ TAXONOMY_ID: '{ciaid}'}}";
             var awaiter = m_MongoCollection.FindAsync<CategoryFromMongo>(filter).GetAwaiter();
             CategoryFromMongo mongoCategory = awaiter.GetResult().SingleOrDefault();
-            Category category = _mapper.Map<Category>(mongoCategory);
+            Category category = _catFromMongoToCatMapper.MapFrom(mongoCategory);
             return category;
         }
 
@@ -130,7 +131,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
             var filter = $"{{ TAXONOMY: '{title}'}}";
             var awaiter = m_MongoCollection.FindAsync<CategoryFromMongo>(filter).GetAwaiter();
             CategoryFromMongo mongoCategory = awaiter.GetResult().Single();
-            Category category = _mapper.Map<Category>(mongoCategory);
+            Category category = _catFromMongoToCatMapper.MapFrom(mongoCategory);
             return category;
         }
 
@@ -172,7 +173,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.Mongo
                 var newCategory = new CategoryFromMongo() { CIAID = nextId, Title = title, QueryText = query, SC = score };
                 m_MongoCollection.InsertOne(newCategory);
 
-                return _mapper.Map<Category>(newCategory);
+                return _catFromMongoToCatMapper.MapFrom(newCategory);
             }
             catch (Exception)
             {

@@ -1,9 +1,9 @@
-﻿using AutoMapper;
-using NationalArchives.Taxonomy.Common.BusinessObjects;
+﻿using NationalArchives.Taxonomy.Common.BusinessObjects;
 using NationalArchives.Taxonomy.Common.DataObjects.OpenSearch;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Common;
 using NationalArchives.Taxonomy.Common.Domain.Repository.Lucene;
 using NationalArchives.Taxonomy.Common.Helpers;
+using NationalArchives.Taxonomy.Common.Mappers;
 using OpenSearch.Client;
 using System;
 using System.Collections.Generic;
@@ -17,9 +17,18 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
     {
         private LuceneHelperTools _luceneHelperTools;
 
-        public OpenSearchIAViewRepository(IConnectOpenSearch<OpenSearchRecordAssetView> openSearchConnection, LuceneHelperTools luceneHelperTools, IMapper mapper) : base(openSearchConnection, mapper)
+        private readonly IMapper<OpenSearchRecordAssetView, InformationAssetView> _OsRavToIavMapper;
+        private readonly IMapper<InformationAssetView, OpenSearchRecordAssetView> _IavToOsRavMapper;
+        private readonly IMapper<OpenSearchRecordAssetView, InformationAssetViewWithScore> _OsRavToIavScoreMapper;
+        public OpenSearchIAViewRepository(IConnectOpenSearch<OpenSearchRecordAssetView> openSearchConnection, LuceneHelperTools luceneHelperTools,
+            IMapper<OpenSearchRecordAssetView, InformationAssetView> OsRavToIavMapper, IMapper<InformationAssetView, OpenSearchRecordAssetView> IavToOsRavMapper,
+            IMapper<OpenSearchRecordAssetView, InformationAssetViewWithScore> OsRavToIavScoreMapper) 
+            : base(openSearchConnection)
         {
             _luceneHelperTools = luceneHelperTools;
+            _OsRavToIavMapper = OsRavToIavMapper;
+            _IavToOsRavMapper = IavToOsRavMapper;
+            _OsRavToIavScoreMapper = OsRavToIavScoreMapper;
         }
 
         public async Task<InformationAssetView> SearchDocByDocReference(string docReference)
@@ -45,8 +54,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
                 // One advantage is with ISearchResponse we can use base type ElasticSearchResultAssetView.
 
                 // InformationAssetView == BO
-                var infoAsset = _mapper.Map<InformationAssetView>(searchResult);
-
+                var infoAsset = _OsRavToIavMapper.MapFrom(searchResult);
 
                 return infoAsset;
             }
@@ -76,7 +84,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
                 foreach (var result in results)
                 {
                     OpenSearchRecordAssetView searchResult = result.Source;
-                    var infoAsset = _mapper.Map<InformationAssetView>(searchResult);
+                    var infoAsset = _OsRavToIavMapper.MapFrom(searchResult);
 
                     // Possibly the previous lack of null check was leading to the object ref error at InMemoryCategoriserRepository.cs:line 370
                     if (infoAsset != null)
@@ -108,8 +116,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 
             try
             {
-
-                OpenSearchRecordAssetView esAsset = _mapper.Map<InformationAssetView, OpenSearchRecordAssetView>(iaView);
+                OpenSearchRecordAssetView esAsset = _IavToOsRavMapper.MapFrom(iaView);
                 IndexResponse response = _openSearchConnection.IndexDocument(esAsset, useInmemoryIndex: true);
 
                 //Race condition in ES?
@@ -173,7 +180,7 @@ namespace NationalArchives.Taxonomy.Common.Domain.Repository.OpenSearch
 
                 Debug.Print(searchResponse.GetType().Name);
 
-                var paginatedListFactory = new IAListFactory<OpenSearchRecordAssetView, InformationAssetViewWithScore>(searchResponse, _mapper);
+                var paginatedListFactory = new IAListFactory<OpenSearchRecordAssetView, InformationAssetViewWithScore>(searchResponse, _OsRavToIavScoreMapper);
                 var paginatedList = paginatedListFactory.CreatePaginatedList(limit: limit, offset: offset, minScore: minScore);
 
                 return paginatedList;
